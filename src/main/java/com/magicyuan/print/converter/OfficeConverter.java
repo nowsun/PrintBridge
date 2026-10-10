@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
  * 基于JODConverter和LibreOffice实现Word、Excel、PPT等格式转PDF
  * 
  * @author Magic_yuan
- * @version 2.1.0
+ * @version 2.1.3
  */
 public class OfficeConverter {
 
@@ -239,4 +239,3 @@ public class OfficeConverter {
         return (lastDot > 0) ? path.substring(lastDot) : ".tmp";
     }
 }
-

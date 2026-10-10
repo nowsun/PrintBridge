@@ -2,8 +2,10 @@ package com.magicyuan.print.service;
 
 import java.awt.print.Book;
 import java.awt.print.PageFormat;
+import java.awt.print.Paper;
 import java.awt.print.PrinterJob;
 import java.io.File;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
@@ -12,10 +14,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.magicyuan.print.config.AppSettings;
 import com.magicyuan.print.converter.OfficeConverter;
 import com.magicyuan.print.dto.PrintDTO;
+import com.magicyuan.print.i18n.I18nManager;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.printing.PDFPrintable;
 import org.apache.pdfbox.printing.Scaling;
 import org.slf4j.Logger;
@@ -30,7 +38,7 @@ import com.magicyuan.print.model.PrintQueueModel;
  * 支持PDF、Office文档(Word/Excel/PPT)、图片等格式
  * 
  * @author Magic_yuan
- * @version 2.1.0
+ * @version 2.1.3
  */
 public class PrintService {
 
@@ -40,6 +48,10 @@ public class PrintService {
     private final ExecutorService executorService;
     private final OfficeConverter officeConverter;
     private final ImageConverter imageConverter;
+
+    private volatile String defaultPrinterName = "";
+    private volatile double paperWidthMm = AppSettings.DEFAULT_PAPER_WIDTH_MM;
+    private volatile double paperHeightMm = AppSettings.DEFAULT_PAPER_HEIGHT_MM;
 
     public PrintService(PrintQueueModel printQueueModel) {
         this.printQueueModel = printQueueModel;
@@ -71,6 +83,30 @@ public class PrintService {
     }
 
     /**
+     * 应用配置到打印引擎(默认打印机、默认纸张)。
+     */
+    public void applySettings(AppSettings settings) {
+        this.defaultPrinterName = settings.getPrinterName() == null ? "" : settings.getPrinterName();
+        this.paperWidthMm = settings.getPaperWidthMm() > 0 ? settings.getPaperWidthMm() : AppSettings.DEFAULT_PAPER_WIDTH_MM;
+        this.paperHeightMm = settings.getPaperHeightMm() > 0 ? settings.getPaperHeightMm() : AppSettings.DEFAULT_PAPER_HEIGHT_MM;
+        logger.info("打印设置已应用: 打印机={}, 纸张={}x{}mm",
+            defaultPrinterName.isEmpty() ? "系统默认" : defaultPrinterName, paperWidthMm, paperHeightMm);
+    }
+
+    /**
+     * 按名称查找打印机。
+     */
+    private javax.print.PrintService findPrinterByName(String name) {
+        javax.print.PrintService[] services = javax.print.PrintServiceLookup.lookupPrintServices(null, null);
+        for (javax.print.PrintService service : services) {
+            if (service.getName().equals(name)) {
+                return service;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 异步打印文档（带对话框）
      */
     public CompletableFuture<Void> printWithDialogAsync(List<PrintDTO> printDTOList) {
@@ -86,6 +122,84 @@ public class PrintService {
         return CompletableFuture.runAsync(() -> {
             printWithoutDialog(printDTOList);
         }, executorService);
+    }
+
+    /**
+     * Asynchronously print a PDF uploaded by a local browser client without a dialog.
+     */
+    public CompletableFuture<Void> printPdfBytesWithoutDialogAsync(
+            byte[] pdfBytes, String fileName, boolean landscape) {
+        final byte[] documentBytes = pdfBytes;
+        final PrintDTO printDTO = new PrintDTO();
+        printDTO.setFileName(fileName);
+        printDTO.setLandscape(landscape);
+        printDTO.setSource("web");
+
+        return CompletableFuture.runAsync(() -> {
+            try (PDDocument document = PDDocument.load(documentBytes)) {
+                executePrint(document, printDTO, false);
+                printQueueModel.addPrintTask(printDTO);
+            } catch (Exception exception) {
+                handlePrintError(printDTO, exception);
+            }
+        }, executorService);
+    }
+
+    /**
+     * 提交一张测试校准页, 使用当前默认打印机与纸张设置。
+     */
+    public CompletableFuture<Void> testPrintPageAsync() {
+        final PrintDTO printDTO = new PrintDTO();
+        printDTO.setFileName(I18nManager.zhEn("测试打印", "Test print"));
+        printDTO.setLandscape(false);
+        printDTO.setSource("test");
+
+        return CompletableFuture.runAsync(() -> {
+            PDDocument document = null;
+            try {
+                document = createTestPage();
+                executePrint(document, printDTO, false);
+                printQueueModel.addPrintTask(printDTO);
+            } catch (Exception e) {
+                handlePrintError(printDTO, e);
+                throw new RuntimeException(e);
+            } finally {
+                if (document != null) {
+                    try {
+                        document.close();
+                    } catch (IOException ignored) {
+                        // 忽略关闭异常
+                    }
+                }
+            }
+        }, executorService);
+    }
+
+    /**
+     * 生成一张简单的测试页 PDF。
+     */
+    private PDDocument createTestPage() throws IOException {
+        PDDocument document = new PDDocument();
+        PDPage page = new PDPage(PDRectangle.A4);
+        document.addPage(page);
+
+        PDPageContentStream content = new PDPageContentStream(document, page);
+        try {
+            content.beginText();
+            content.setFont(PDType1Font.HELVETICA_BOLD, 22);
+            content.newLineAtOffset(70, 760);
+            content.showText("PrintBridge Test Page");
+            content.endText();
+
+            content.beginText();
+            content.setFont(PDType1Font.HELVETICA, 12);
+            content.newLineAtOffset(70, 730);
+            content.showText(new java.util.Date().toString());
+            content.endText();
+        } finally {
+            content.close();
+        }
+        return document;
     }
 
     /**
@@ -214,8 +328,35 @@ public class PrintService {
     private boolean executePrint(PDDocument document, PrintDTO printDTO, boolean showDialog) throws Exception {
         PrinterJob job = PrinterJob.getPrinterJob();
 
-        // 设置页面格式
+        // 应用默认打印机
+        if (StringUtils.isNotBlank(defaultPrinterName)) {
+            javax.print.PrintService targetPrinter = findPrinterByName(defaultPrinterName);
+            if (targetPrinter != null) {
+                try {
+                    job.setPrintService(targetPrinter);
+                } catch (java.awt.print.PrinterException e) {
+                    logger.warn("设置打印机失败, 使用系统默认打印机: {}", e.getMessage());
+                }
+            } else {
+                logger.warn("未找到配置的打印机: {}, 使用系统默认打印机", defaultPrinterName);
+            }
+        }
+
+        // 记录实际使用的打印机(未配置时回退系统默认)
+        javax.print.PrintService usedService = job.getPrintService();
+        if (usedService == null) {
+            usedService = javax.print.PrintServiceLookup.lookupDefaultPrintService();
+        }
+        printDTO.setPrinterName(usedService != null ? usedService.getName() : "");
+
+        // 设置页面格式(纸张尺寸)
         PageFormat pageFormat = new PageFormat();
+        Paper paper = new Paper();
+        double paperWidthPt = paperWidthMm * 72.0 / 25.4;
+        double paperHeightPt = paperHeightMm * 72.0 / 25.4;
+        paper.setSize(paperWidthPt, paperHeightPt);
+        paper.setImageableArea(0, 0, paperWidthPt, paperHeightPt);
+        pageFormat.setPaper(paper);
         if (printDTO.isLandscape()) {
             pageFormat.setOrientation(PageFormat.LANDSCAPE);
         }

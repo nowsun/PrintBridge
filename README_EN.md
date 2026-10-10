@@ -57,26 +57,44 @@ PrintBridge was born from real-world business pain points: when web applications
 
 ### Launch Service
 
-#### Method 1: Maven Quick Start (Recommended)
+#### Build a standalone JAR (Maven is only needed on the build machine)
 ```bash
-# Clone from GitHub
-git clone https://github.com/magicyuan876/PrintBridge.git
-
-# Enter directory
-cd PrintBridge
-
-# Start service
-mvn clean compile exec:java -Dexec.mainClass="com.magicyuan.print.PrintApplication"
+mvn clean package
 ```
 
-#### Method 2: Direct Run
+Copy `target/printbridge-2.1.3.jar` to the target computer. Only Java 8 or later is required there; Maven is not needed.
+
+#### Run
 ```bash
-javac -cp "lib/*" -d target/classes src/main/java/**/*.java
-java -cp "target/classes:lib/*" com.magicyuan.print.PrintApplication
+java -Dfile.encoding=UTF-8 -jar printbridge-2.1.3.jar
 ```
+
+On Windows, you can also double-click `Start-PrintBridge.bat` to start PrintBridge manually. Put the JAR beside the batch file, or run it from the project directory where the JAR is in `target`. The console remains open after PrintBridge exits; press any key to close it.
+
+#### Start automatically when a Windows user logs in
+Place `printbridge-2.1.3.jar`, `Register-PrintBridgeStartup.ps1`, and `Unregister-PrintBridgeStartup.ps1` in the same folder. Alternatively, run the scripts from the project directory; they will look for `target/printbridge-2.1.3.jar`.
+
+Run PowerShell as the Windows user who should run PrintBridge:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Register-PrintBridgeStartup.ps1
+```
+
+This registers a per-user scheduled task named `PrintBridge-AtLogOn`. To remove it:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Unregister-PrintBridgeStartup.ps1
+```
+
+Removing the task does not stop a currently running instance. The task runs in the interactive user session and does not require administrator privileges.
 
 ### Verify Installation
 After startup, visit `http://localhost:8281/health`. Seeing `{"status":"ok"}` indicates the service is running normally.
+
+### Main Window and Background Operation
+- The LibreOffice installation prompt no longer appears automatically at startup. Use the “Install Multi-format Support” button at the top-right of the print queue to open the guide.
+- The panel to the right of the print queue shows currently supported formats; Office formats appear when LibreOffice is available.
+- Closing the main window hides PrintBridge in the system tray without stopping the service. To exit, select “Exit” from the tray icon menu.
 
 ### LibreOffice Configuration (Optional)
 
@@ -387,4 +405,3 @@ Made with ❤️ by developers, for developers
 [⭐ Star on GitHub](https://github.com/magicyuan876/PrintBridge) · [Report Issues](https://github.com/magicyuan876/PrintBridge/issues) · [Discussions](https://github.com/magicyuan876/PrintBridge/discussions)
 
 </div>
-

@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.magicyuan.print.i18n.I18nManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,16 +127,21 @@ public class ServerStatusService {
 
     public enum ServerStatus {
 
-        STARTING("正在启动服务..."), RUNNING("服务运行正常"), ERROR("服务启动失败"), STOPPED("服务已停止");
+        STARTING("正在启动服务...", "Starting service..."),
+        RUNNING("服务运行正常", "Service running normally"),
+        ERROR("服务启动失败", "Service failed to start"),
+        STOPPED("服务已停止", "Service stopped");
 
-        private final String message;
+        private final String zh;
+        private final String en;
 
-        ServerStatus(String message) {
-            this.message = message;
+        ServerStatus(String zh, String en) {
+            this.zh = zh;
+            this.en = en;
         }
 
         public String getMessage() {
-            return message;
+            return I18nManager.zhEn(zh, en);
         }
     }
 

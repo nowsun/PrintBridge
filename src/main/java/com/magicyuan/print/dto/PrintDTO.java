@@ -8,6 +8,15 @@ public class PrintDTO {
 
     private boolean landscape = false;
 
+    /** 任务进入队列的时间戳(毫秒) */
+    private long createTime;
+
+    /** 实际使用的打印机名称 */
+    private String printerName;
+
+    /** 任务来源: web(网页) / test(测试) */
+    private String source;
+
     public String getFileUrl() {
         return fileUrl;
     }
@@ -30,6 +39,30 @@ public class PrintDTO {
 
     public void setLandscape(boolean landscape) {
         this.landscape = landscape;
+    }
+
+    public long getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(long createTime) {
+        this.createTime = createTime;
+    }
+
+    public String getPrinterName() {
+        return printerName;
+    }
+
+    public void setPrinterName(String printerName) {
+        this.printerName = printerName;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     @Override

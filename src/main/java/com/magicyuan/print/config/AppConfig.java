@@ -7,13 +7,13 @@ import com.magicyuan.print.i18n.I18nManager;
  * 管理应用的基本配置信息
  * 
  * @author Magic_yuan
- * @version 2.1.0
+ * @version 2.1.3
  */
 public class AppConfig {
 
     // 静态常量
     public static final String APP_NAME = "PrintBridge";
-    public static final String APP_VERSION = "v2.1.0";
+    public static final String APP_VERSION = "v2.1.3";
     public static final String APP_AUTHOR = "Magic_yuan";
 
     // 国际化字符串(通过方法获取,支持动态切换语言)
@@ -40,9 +40,9 @@ public class AppConfig {
     public static final String COPYRIGHT = "© 2020-2025 Magic_yuan. All rights reserved.";
 
     // UI配置
-    public static final int WINDOW_WIDTH = 800;
+    public static final int WINDOW_WIDTH = 960;
 
-    public static final int WINDOW_HEIGHT = 600;
+    public static final int WINDOW_HEIGHT = 680;
 
     public static final int WINDOW_X = 200;
 

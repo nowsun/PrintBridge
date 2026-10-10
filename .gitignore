@@ -21,3 +21,15 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+
+# Build output
+target/
+
+# Runtime logs
+logs/
+
+# Local runtime config
+printbridge.ini
+
+# Personal notes
+new.MD

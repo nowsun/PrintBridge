@@ -1,6 +1,13 @@
 package com.magicyuan.print.i18n;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.PropertyResourceBundle;
 import java.util.ResourceBundle;
 import java.util.MissingResourceException;
 import org.slf4j.Logger;
@@ -11,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * 负责加载和管理多语言资源
  * 
  * @author Magic_yuan
- * @version 2.1.0
+ * @version 2.1.3
  */
 public class I18nManager {
 
@@ -50,13 +57,13 @@ public class I18nManager {
      */
     private static void loadResourceBundle() {
         try {
-            resourceBundle = ResourceBundle.getBundle(BUNDLE_NAME, currentLocale);
+            resourceBundle = ResourceBundle.getBundle(BUNDLE_NAME, currentLocale, new UTF8Control());
             logger.info("成功加载语言资源: {}", currentLocale);
         } catch (MissingResourceException e) {
             logger.error("无法加载语言资源文件: {}", e.getMessage());
             // 降级到默认Locale
             try {
-                resourceBundle = ResourceBundle.getBundle(BUNDLE_NAME, Locale.US);
+                resourceBundle = ResourceBundle.getBundle(BUNDLE_NAME, Locale.US, new UTF8Control());
                 logger.warn("降级使用英文资源文件");
             } catch (MissingResourceException ex) {
                 logger.error("严重错误: 无法加载任何语言资源文件");
@@ -135,8 +142,49 @@ public class I18nManager {
      * 检查是否为英文环境
      */
     public static boolean isEnglish() {
-        return currentLocale != null && 
+        return currentLocale != null &&
                "en".equals(currentLocale.getLanguage());
     }
-}
 
+    /**
+     * 根据当前语言返回中文字符串或英文字符串(用于界面新增文案)。
+     */
+    public static String zhEn(String zh, String en) {
+        return isChinese() ? zh : en;
+    }
+
+    /**
+     * 以 UTF-8 编码加载 properties 资源。
+     * 默认 PropertyResourceBundle 使用 ISO-8859-1, 会误读文件中的原生非 ASCII 字符(如 ©)。
+     */
+    private static class UTF8Control extends ResourceBundle.Control {
+        @Override
+        public ResourceBundle newBundle(String baseName, Locale locale, String format,
+                                        ClassLoader loader, boolean reload)
+                throws IllegalAccessException, InstantiationException, IOException {
+            String bundleName = toBundleName(baseName, locale);
+            String resourceName = toResourceName(bundleName, "properties");
+            InputStream stream = null;
+            if (reload) {
+                URL url = loader.getResource(resourceName);
+                if (url != null) {
+                    URLConnection connection = url.openConnection();
+                    if (connection != null) {
+                        connection.setUseCaches(false);
+                        stream = connection.getInputStream();
+                    }
+                }
+            } else {
+                stream = loader.getResourceAsStream(resourceName);
+            }
+            if (stream == null) {
+                return null;
+            }
+            try {
+                return new PropertyResourceBundle(new InputStreamReader(stream, StandardCharsets.UTF_8));
+            } finally {
+                stream.close();
+            }
+        }
+    }
+}

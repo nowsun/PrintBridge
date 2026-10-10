@@ -1,6 +1,7 @@
 package com.magicyuan.print.ui;
 
 import java.awt.*;
+import java.awt.event.ActionListener;
 
 import javax.swing.*;
 
@@ -9,6 +10,7 @@ import com.magicyuan.print.config.AppConfig;
 import com.magicyuan.print.dto.PrintDTO;
 import com.magicyuan.print.i18n.I18nManager;
 import com.magicyuan.print.model.PrintQueueModel;
+import com.magicyuan.print.service.PrintService;
 import com.magicyuan.print.service.ServerStatusService;
 
 /**
@@ -19,6 +21,14 @@ import com.magicyuan.print.service.ServerStatusService;
  * @version 2.0.0
  */
 public class UIComponentFactory {
+
+    /** 页签内统一字体: 标签/编辑框 15px, 提示小字 13px */
+    public static final Font FIELD_FONT = new Font(AppConfig.Fonts.FONT_FAMILY, Font.PLAIN, 15);
+    public static final Font LABEL_FONT = new Font(AppConfig.Fonts.FONT_FAMILY, Font.PLAIN, 15);
+    public static final Font HINT_FONT = new Font(AppConfig.Fonts.FONT_FAMILY, Font.PLAIN, 13);
+
+    /** 页签内统一控件高度(参考 TS 版 h-9 = 36px) */
+    public static final int CONTROL_HEIGHT = 36;
 
     /**
      * 创建主菜单栏
@@ -47,8 +57,8 @@ public class UIComponentFactory {
      */
     public static JPanel createMainPanel() {
         JPanel mainPanel = new JPanel(new BorderLayout(15, 15));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        mainPanel.setBackground(AppConfig.Colors.BACKGROUND);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
+        mainPanel.setBackground(themeColor("Panel.background", AppConfig.Colors.BACKGROUND));
         return mainPanel;
     }
 
@@ -57,8 +67,10 @@ public class UIComponentFactory {
      */
     public static JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setBackground(AppConfig.Colors.WHITE);
-        topPanel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(AppConfig.Colors.BORDER, 1), BorderFactory.createEmptyBorder(15, 20, 15, 20)));
+        topPanel.setBackground(themeColor("Panel.background", AppConfig.Colors.WHITE));
+        topPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(themeColor("Component.borderColor", AppConfig.Colors.BORDER), 1),
+            BorderFactory.createEmptyBorder(15, 20, 15, 20)));
 
         return topPanel;
     }
@@ -66,30 +78,50 @@ public class UIComponentFactory {
     /**
      * 创建左侧信息面板
      */
-    public static JPanel createLeftInfoPanel() {
+    public static JPanel createLeftInfoPanel(int port) {
         JPanel leftInfoPanel = new JPanel(new BorderLayout());
         leftInfoPanel.setOpaque(false);
 
         JLabel titleLabel = new JLabel(AppConfig.getAppDescription());
         titleLabel.setFont(new Font(AppConfig.Fonts.FONT_FAMILY, Font.BOLD, AppConfig.Fonts.TITLE_SIZE));
-        titleLabel.setForeground(AppConfig.Colors.TEXT_PRIMARY);
+        titleLabel.setForeground(themeColor("Label.foreground", AppConfig.Colors.TEXT_PRIMARY));
 
-        JLabel versionLabel = new JLabel(AppConfig.APP_VERSION);
-        versionLabel.setFont(new Font(AppConfig.Fonts.FONT_FAMILY, Font.PLAIN, AppConfig.Fonts.SMALL_SIZE));
-        versionLabel.setForeground(AppConfig.Colors.TEXT_SECONDARY);
+        JLabel portLabel = new JLabel(portLabelText(port));
+        portLabel.setFont(new Font(AppConfig.Fonts.FONT_FAMILY, Font.PLAIN, AppConfig.Fonts.SMALL_SIZE));
+        portLabel.setForeground(themeColor("Label.disabledForeground", AppConfig.Colors.TEXT_SECONDARY));
 
         leftInfoPanel.add(titleLabel, BorderLayout.NORTH);
-        leftInfoPanel.add(versionLabel, BorderLayout.CENTER);
+        leftInfoPanel.add(portLabel, BorderLayout.CENTER);
 
         return leftInfoPanel;
     }
 
     /**
+     * 标题框内本地端口文案
+     */
+    public static String portLabelText(int port) {
+        return I18nManager.zhEn("本地端口", "Local port") + ": " + port;
+    }
+
+    /**
      * 创建状态面板
      */
-    public static JPanel createStatusPanel() {
-        JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+    public static JPanel createStatusPanel(JLabel indicator, JLabel textLabel) {
+        JPanel statusPanel = new JPanel(new GridBagLayout());
         statusPanel.setOpaque(false);
+
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
+        row.setOpaque(false);
+        row.add(indicator);
+        row.add(textLabel);
+
+        GridBagConstraints c = new GridBagConstraints();
+        c.weightx = 1.0;
+        c.weighty = 1.0;
+        c.anchor = GridBagConstraints.CENTER;
+        c.fill = GridBagConstraints.NONE;
+        statusPanel.add(row, c);
+
         return statusPanel;
     }
 
@@ -99,7 +131,7 @@ public class UIComponentFactory {
     public static JLabel createStatusTextLabel() {
         JLabel statusText = new JLabel(ServerStatusService.ServerStatus.STARTING.getMessage());
         statusText.setFont(new Font(AppConfig.Fonts.FONT_FAMILY, Font.PLAIN, AppConfig.Fonts.NORMAL_SIZE));
-        statusText.setForeground(AppConfig.Colors.TEXT_SECONDARY);
+        statusText.setForeground(themeColor("Label.disabledForeground", AppConfig.Colors.TEXT_SECONDARY));
         return statusText;
     }
 
@@ -164,7 +196,7 @@ public class UIComponentFactory {
     /**
      * 创建列表标题面板
      */
-    public static JPanel createListHeaderPanel() {
+    public static JPanel createListHeaderPanel(ActionListener installMultiFormatListener) {
         JPanel listHeaderPanel = new JPanel(new BorderLayout());
         listHeaderPanel.setOpaque(false);
         listHeaderPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
@@ -183,8 +215,113 @@ public class UIComponentFactory {
         titleContainer.add(listSubtitle, BorderLayout.CENTER);
 
         listHeaderPanel.add(titleContainer, BorderLayout.WEST);
+        JButton installMultiFormatButton = new JButton(
+            I18nManager.getString("multiformat.button.install")
+        );
+        installMultiFormatButton.addActionListener(installMultiFormatListener);
+        listHeaderPanel.add(installMultiFormatButton, BorderLayout.EAST);
 
         return listHeaderPanel;
+    }
+
+    /**
+     * 创建支持格式说明面板
+     */
+    public static JPanel createSupportedFormatsPanel(PrintService printService) {
+        JPanel formatsPanel = new JPanel();
+        formatsPanel.setLayout(new BoxLayout(formatsPanel, BoxLayout.Y_AXIS));
+        formatsPanel.setBackground(AppConfig.Colors.WHITE);
+        formatsPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(AppConfig.Colors.BORDER, 1),
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        formatsPanel.setPreferredSize(new Dimension(210, 0));
+
+        JLabel title = new JLabel(I18nManager.getString("main.queue.formats.title"));
+        title.setFont(new Font(AppConfig.Fonts.FONT_FAMILY, Font.BOLD, AppConfig.Fonts.NORMAL_SIZE));
+        title.setForeground(AppConfig.Colors.TEXT_PRIMARY);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        formatsPanel.add(title);
+        formatsPanel.add(Box.createVerticalStrut(12));
+
+        addFormatLabel(formatsPanel, I18nManager.getString("main.queue.formats.pdf"));
+        addFormatLabel(formatsPanel, I18nManager.getString("main.queue.formats.images"));
+        if (printService.isOfficeConverterAvailable()) {
+            addFormatLabel(formatsPanel, I18nManager.getString("main.queue.formats.office"));
+        }
+
+        return formatsPanel;
+    }
+
+    private static void addFormatLabel(JPanel panel, String text) {
+        JLabel formatLabel = new JLabel("\u2022 " + text);
+        formatLabel.setFont(new Font(AppConfig.Fonts.FONT_FAMILY, Font.PLAIN, AppConfig.Fonts.SMALL_SIZE));
+        formatLabel.setForeground(AppConfig.Colors.TEXT_SECONDARY);
+        formatLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(formatLabel);
+        panel.add(Box.createVerticalStrut(8));
+    }
+
+    /**
+     * \u4e3b\u9898\u611f\u77e5\u989c\u8272: \u4f18\u5148\u53d6\u5f53\u524d FlatLaf \u4e3b\u9898\u7684 UI \u989c\u8272, \u4e3b\u9898\u5207\u6362\u65f6\u53ef\u81ea\u52a8\u66f4\u65b0\u3002
+     */
+    public static Color themeColor(String key, Color fallback) {
+        Color color = UIManager.getColor(key);
+        return color != null ? color : fallback;
+    }
+
+    /**
+     * 页签内统一标签样式(15px)
+     */
+    public static JLabel label(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(LABEL_FONT);
+        label.setForeground(themeColor("Label.foreground", AppConfig.Colors.TEXT_PRIMARY));
+        return label;
+    }
+
+    /**
+     * 页签内统一提示小字样式(13px)
+     */
+    public static JLabel hint(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(HINT_FONT);
+        label.setForeground(themeColor("Label.disabledForeground", AppConfig.Colors.TEXT_SECONDARY));
+        return label;
+    }
+
+    /**
+     * 页签内统一按钮样式(15px, 高 36px)
+     */
+    public static JButton button(String text) {
+        JButton button = new JButton(text);
+        button.setFont(FIELD_FONT);
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(button.getPreferredSize().width, CONTROL_HEIGHT));
+        button.setMinimumSize(new Dimension(0, CONTROL_HEIGHT));
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, CONTROL_HEIGHT));
+        return button;
+    }
+
+    /**
+     * 页签内统一文本框样式
+     */
+    public static void styleField(JTextField field, int width) {
+        field.setFont(FIELD_FONT);
+        field.setPreferredSize(new Dimension(width, CONTROL_HEIGHT));
+        field.setMaximumSize(new Dimension(width == 0 ? Integer.MAX_VALUE : width, CONTROL_HEIGHT));
+    }
+
+    /**
+     * 页签内统一下拉框样式
+     */
+    public static void styleCombo(JComboBox<String> combo) {
+        combo.setFont(FIELD_FONT);
+        Dimension preferred = combo.getPreferredSize();
+        combo.setPreferredSize(new Dimension(preferred.width, CONTROL_HEIGHT));
+        combo.setMinimumSize(new Dimension(0, CONTROL_HEIGHT));
+        combo.setMaximumSize(new Dimension(Integer.MAX_VALUE, CONTROL_HEIGHT));
     }
 
     /**

@@ -40,6 +40,9 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
      * 添加打印任务
      */
     public void addPrintTask(PrintDTO printDTO) {
+        if (printDTO.getCreateTime() == 0) {
+            printDTO.setCreateTime(System.currentTimeMillis());
+        }
         printQueue.add(printDTO);
         int index = printQueue.size() - 1;
         fireIntervalAdded(this, index, index);
@@ -104,6 +107,9 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
      * 添加错误任务
      */
     public void addErrorTask(PrintDTO printDTO) {
+        if (printDTO.getCreateTime() == 0) {
+            printDTO.setCreateTime(System.currentTimeMillis());
+        }
         errorQueue.add(printDTO);
     }
 

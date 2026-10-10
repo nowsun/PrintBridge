@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import com.magicyuan.print.model.PrintQueueModel;
 import com.magicyuan.print.service.PrintService;
 import com.magicyuan.print.service.ServerStatusService;
-import com.magicyuan.print.ui.SystemTrayManager;
 
 /**
  * 打印控制器类
@@ -111,53 +110,19 @@ public class PrintController {
      */
     private void handleWindowClosing() {
         logger.info("用户尝试关闭窗口");
-
-        // 创建自定义对话框
-        Object[] options = {"最小化到后台", "完全退出", "取消"};
-        int choice = JOptionPane.showOptionDialog(
-            parentFrame,
-            "选择操作:\n\n• 最小化到后台: 隐藏窗口,继续监听浏览器打印\n• 完全退出: 停止服务并关闭程序",
-            "PrintBridge - 关闭确认",
-            JOptionPane.YES_NO_CANCEL_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            options,
-            options[0]
-        );
-
-        switch (choice) {
-            case 0: // 最小化到后台
-                logger.info("用户选择最小化到后台");
-                minimizeToTray();
-                break;
-            case 1: // 完全退出
-                logger.info("用户选择完全退出");
-                cleanup();
-                System.exit(0);
-                break;
-            case 2: // 取消
-            default:
-                logger.info("用户取消关闭操作");
-                // 什么都不做,窗口保持打开状态
-                break;
+        if (!parentFrame.getSystemTrayManager().showTrayIcon()) {
+            JOptionPane.showMessageDialog(
+                parentFrame,
+                "当前系统无法显示托盘图标，窗口保持打开。",
+                "PrintBridge",
+                JOptionPane.WARNING_MESSAGE
+            );
+            return;
         }
-    }
-    
-    /**
-     * 最小化到系统托盘
-     */
-    private void minimizeToTray() {
-        SystemTrayManager trayManager = parentFrame.getSystemTrayManager();
-        
-        // 隐藏窗口
         parentFrame.setVisible(false);
-        
-        // 显示托盘图标
-        trayManager.showTrayIcon();
-        
         logger.info("窗口已最小化到系统托盘");
     }
-
+    
     /**
      * 显示信息对话框
      */
@@ -216,16 +181,4 @@ public class PrintController {
         return printService.getAvailablePrinters();
     }
 
-    /**
-     * 清理资源
-     */
-    private void cleanup() {
-        try {
-            printService.shutdown();
-            serverStatusService.shutdown();
-            logger.info("资源清理完成");
-        } catch (Exception e) {
-            logger.error("资源清理时发生错误: {}", e.getMessage(), e);
-        }
-    }
 }

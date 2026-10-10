@@ -1,15 +1,24 @@
 package com.magicyuan.print.service;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.magicyuan.print.config.AppSettings;
 import com.magicyuan.print.dto.PrintDTO;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
@@ -36,11 +45,14 @@ public class JettyPrintService {
 
     private static final int MAX_THREADS = 100;
 
+    private static final int MAX_PDF_BYTES = 50 * 1024 * 1024;
+
     private Server server;
 
     private boolean isRunning = false;
     
     private PrintService printService;
+    private volatile Set<String> allowedOrigins;
 
     /**
      * 构造函数
@@ -48,6 +60,7 @@ public class JettyPrintService {
      */
     public JettyPrintService(PrintService printService) {
         this.printService = printService;
+        this.allowedOrigins = new HashSet<String>(AppSettings.load().getAllowedOrigins());
     }
 
     /**
@@ -72,7 +85,7 @@ public class JettyPrintService {
             // 创建HTTP连接器
             org.eclipse.jetty.server.ServerConnector connector = new org.eclipse.jetty.server.ServerConnector(server);
             connector.setPort(port);
-            connector.setHost("0.0.0.0");
+            connector.setHost("127.0.0.1");
 
             server.addConnector(connector);
 
@@ -100,8 +113,10 @@ public class JettyPrintService {
             isRunning = true;
 
             logger.info("PrintBridge服务已启动，监听端口: " + port);
+            logger.info("允许的网页来源: {}", allowedOrigins);
             logger.info("服务端点:");
-            logger.info("  - POST /print  : 打印服务");
+            logger.info("  - POST /print       : URL打印服务");
+            logger.info("  - POST /print/pdf   : PDF上传并静默打印");
             logger.info("  - GET  /health : 健康检查");
 
             return true;
@@ -145,11 +160,83 @@ public class JettyPrintService {
     /**
      * 设置CORS头
      */
-    private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    private void setCorsHeaders(HttpServletRequest request, HttpServletResponse response) {
+        String origin = request.getHeader("Origin");
+        if (isAllowedOrigin(origin)) {
+            response.setHeader("Access-Control-Allow-Origin", origin);
+        }
+        response.setHeader("Vary", "Origin");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
         response.setHeader("Access-Control-Max-Age", "3600");
+        if ("true".equalsIgnoreCase(request.getHeader("Access-Control-Request-Private-Network"))) {
+            response.setHeader("Access-Control-Allow-Private-Network", "true");
+        }
+    }
+
+    private boolean isAllowedOrigin(String origin) {
+        if (origin == null) {
+            return false;
+        }
+        for (String allowed : allowedOrigins) {
+            if (matchesOrigin(allowed, origin)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 判断请求 Origin 是否命中白名单。
+     * 支持子域名: 白名单 https://siksoft.com 同时覆盖 https://*.siksoft.com(要求 scheme 与端口一致)。
+     */
+    private boolean matchesOrigin(String allowed, String origin) {
+        if (allowed.equals(origin)) {
+            return true;
+        }
+        try {
+            java.net.URI a = java.net.URI.create(allowed);
+            java.net.URI o = java.net.URI.create(origin);
+            String allowedHost = a.getHost();
+            String originHost = o.getHost();
+            if (allowedHost == null || originHost == null) {
+                return false;
+            }
+            if (!java.util.Objects.equals(a.getScheme(), o.getScheme())) {
+                return false;
+            }
+            if (effectivePort(a) != effectivePort(o)) {
+                return false;
+            }
+            // 子域名: originHost 以 "." + allowedHost 结尾(避免 "siksoft.com.evil.com" 误命中)
+            return originHost.length() > allowedHost.length()
+                && originHost.endsWith("." + allowedHost);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private int effectivePort(java.net.URI uri) {
+        int port = uri.getPort();
+        if (port >= 0) {
+            return port;
+        }
+        if ("https".equalsIgnoreCase(uri.getScheme())) {
+            return 443;
+        }
+        if ("http".equalsIgnoreCase(uri.getScheme())) {
+            return 80;
+        }
+        return -1;
+    }
+
+    /**
+     * 运行时更新允许的网页来源(白名单热生效)。
+     */
+    public void setAllowedOrigins(Collection<String> origins) {
+        Set<String> set = new HashSet<String>(origins);
+        this.allowedOrigins = Collections.unmodifiableSet(set);
+        logger.info("已更新允许的网页来源: {}", allowedOrigins);
     }
 
     /**
@@ -189,17 +276,26 @@ public class JettyPrintService {
         public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
 
             // 设置CORS头
-            setCorsHeaders(response);
+            setCorsHeaders(request, response);
 
             String method = request.getMethod();
 
             try {
                 if ("OPTIONS".equals(method)) {
                     // 处理CORS预检请求
-                    handleOptionsRequest(response);
+                    if (!isAllowedOrigin(request.getHeader("Origin"))) {
+                        sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, "Origin not allowed");
+                    } else {
+                        handleOptionsRequest(response);
+                    }
                 } else if ("POST".equals(method)) {
-                    // 处理打印请求
-                    handlePrintRequest(request, response);
+                    if (!isAllowedOrigin(request.getHeader("Origin"))) {
+                        sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, "Origin not allowed");
+                    } else if (request.getRequestURI().endsWith("/print/pdf")) {
+                        handlePdfUploadRequest(request, response);
+                    } else {
+                        handlePrintRequest(request, response);
+                    }
                 } else {
                     // 不支持的方法
                     sendErrorResponse(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method Not Allowed: " + method);
@@ -216,6 +312,70 @@ public class JettyPrintService {
             response.setStatus(HttpServletResponse.SC_OK);
             response.setContentType("text/plain; charset=UTF-8");
             response.getWriter().write("OK");
+        }
+
+        private void handlePdfUploadRequest(HttpServletRequest request, HttpServletResponse response)
+                throws IOException {
+            String contentType = request.getContentType();
+            if (contentType == null
+                    || !contentType.toLowerCase(Locale.ROOT).startsWith("application/pdf")) {
+                sendErrorResponse(response, HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE,
+                        "Content-Type must be application/pdf");
+                return;
+            }
+
+            int contentLength = request.getContentLength();
+            if (contentLength > MAX_PDF_BYTES) {
+                sendErrorResponse(response, HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE,
+                        "PDF exceeds the 50 MB limit");
+                return;
+            }
+
+            String fileName = request.getParameter("fileName");
+            if (fileName == null || fileName.trim().isEmpty()) {
+                fileName = "report.pdf";
+            }
+            fileName = fileName.replaceAll("[\\r\\n\\p{Cntrl}]", "");
+            if (fileName.length() > 200) {
+                fileName = fileName.substring(0, 200);
+            }
+
+            boolean landscape = Boolean.parseBoolean(request.getParameter("landscape"));
+            byte[] pdfBytes;
+            try (InputStream inputStream = request.getInputStream()) {
+                pdfBytes = readPdfBytes(inputStream);
+            } catch (IllegalArgumentException exception) {
+                sendErrorResponse(response, HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE,
+                        exception.getMessage());
+                return;
+            }
+            if (pdfBytes.length == 0) {
+                sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "PDF body is empty");
+                return;
+            }
+            if (pdfBytes.length < 5
+                    || !"%PDF-".equals(new String(pdfBytes, 0, 5, StandardCharsets.US_ASCII))) {
+                sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid PDF data");
+                return;
+            }
+
+            printService.printPdfBytesWithoutDialogAsync(pdfBytes, fileName, landscape);
+            sendSuccessResponse(response, "PDF print job submitted");
+        }
+
+        private byte[] readPdfBytes(InputStream inputStream) throws IOException {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                total += read;
+                if (total > MAX_PDF_BYTES) {
+                    throw new IllegalArgumentException("PDF exceeds the 50 MB limit");
+                }
+                output.write(buffer, 0, read);
+            }
+            return output.toByteArray();
         }
 
         private void handlePrintRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -235,6 +395,10 @@ public class JettyPrintService {
                 if (printList == null || printList.isEmpty()) {
                     sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid print data");
                     return;
+                }
+
+                for (PrintDTO dto : printList) {
+                    dto.setSource("web");
                 }
 
                 logger.info("收到打印请求，文件数量: {}", printList.size());
@@ -281,7 +445,7 @@ public class JettyPrintService {
         @Override
         public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
 
-            setCorsHeaders(response);
+            setCorsHeaders(request, response);
 
             if ("GET".equals(request.getMethod())) {
                 response.setStatus(HttpServletResponse.SC_OK);
@@ -306,12 +470,16 @@ public class JettyPrintService {
         @Override
         public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
 
-            setCorsHeaders(response);
+            setCorsHeaders(request, response);
 
             if ("OPTIONS".equals(request.getMethod())) {
-                response.setStatus(HttpServletResponse.SC_OK);
-                response.setContentType("text/plain; charset=UTF-8");
-                response.getWriter().write("OK");
+                if (isAllowedOrigin(request.getHeader("Origin"))) {
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.setContentType("text/plain; charset=UTF-8");
+                    response.getWriter().write("OK");
+                } else {
+                    sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, "Origin not allowed");
+                }
                 baseRequest.setHandled(true);
             }
             // 对于非OPTIONS请求，不设置handled，让其他处理器处理

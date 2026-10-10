@@ -59,27 +59,50 @@ PrintBridge诞生于真实业务场景中的痛点:当Web应用需要调用本�
 
 ### 启动服务
 
-#### 方式一: Maven 快速启动(推荐)
+#### 构建独立运行包（只需构建时安装 Maven）
 ```bash
-# 从GitHub克隆
-git clone https://github.com/magicyuan876/PrintBridge.git
-
-# 或从Gitee克隆(国内更快)
-git clone https://gitee.com/magic_yuan_admin/PrintBridge.git
-
-# 启动服务
+# 在项目目录构建包含依赖的可执行 JAR
 cd PrintBridge
-mvn clean compile exec:java -Dexec.mainClass="com.magicyuan.print.PrintApplication"
+mvn clean package
 ```
 
-#### 方式二: 直接运行
+构建完成后，将 `target/printbridge-2.1.3.jar` 复制到目标电脑。目标电脑只需安装 Java 8 或更高版本，无需安装 Maven 或 LibreOffice（仅打印 Office 文档时才需要 LibreOffice）。
+
+#### 运行
 ```bash
-javac -cp "lib/*" -d target/classes src/main/java/**/*.java
-java -cp "target/classes:lib/*" com.magicyuan.print.PrintApplication
+java -Dfile.encoding=UTF-8 -jar printbridge-2.1.3.jar
 ```
+
+Windows 命令提示符如需正确显示中文控制台日志，可先执行 `chcp 65001`，再运行上面的命令。也可以将命令保存为批处理文件，便于用户双击启动。
+
+在 Windows 上也可以双击 [Start-PrintBridge.bat](./Start-PrintBridge.bat) 手动启动。将 JAR 放在批处理文件旁，或从项目目录运行（JAR 位于 `target` 子目录时也可自动找到）。PrintBridge 退出后，批处理窗口会保留，按任意键关闭。
+
+#### Windows 登录时自动启动
+将 `printbridge-2.1.3.jar` 与 `Register-PrintBridgeStartup.ps1`、`Unregister-PrintBridgeStartup.ps1` 放在同一目录。也可以直接在项目目录运行脚本，此时脚本会查找 `target/printbridge-2.1.3.jar`。
+
+以当前 Windows 用户打开 PowerShell，执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Register-PrintBridgeStartup.ps1
+```
+
+脚本会在当前用户的任务计划程序中创建 `PrintBridge-AtLogOn` 任务；用户下次登录时 PrintBridge 会在该用户会话中后台启动。立即启动 PrintBridge 时，可在任务计划程序中运行该任务，或手动执行 `javaw.exe -Dfile.encoding=UTF-8 -jar .\printbridge-2.1.3.jar`。
+
+取消自动启动：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Unregister-PrintBridgeStartup.ps1
+```
+
+取消任务不会关闭当前已运行的 PrintBridge。任务按当前用户注册，不需要管理员权限；用户必须登录，后台程序及默认打印机才可用。
 
 ### 验证安装
 启动后访问 `http://localhost:8281/health` ,看到 `{"status":"ok"}` 即表示服务正常运行。
+
+### 主界面与后台运行
+- 启动时不再自动弹出 LibreOffice 安装提示；点击打印队列右上角的“安装多格式支持”按钮可打开安装指引。
+- 主界面打印队列右侧显示当前支持的格式；安装 LibreOffice 后会显示 Office 格式。
+- 点击主窗口关闭按钮会将程序隐藏到系统托盘，不会退出服务。需要退出时，在托盘图标菜单中选择“退出”。
 
 ### LibreOffice配置(可选)
 
@@ -142,6 +165,39 @@ brew install --cask libreoffice
   "message": "打印任务已加入队列"
 }
 ```
+
+#### 上传 PDF 并直接打印
+浏览器生成的 PDF Blob 不能通过 `fileUrl` 交给本机进程。本接口接收 PDF 二进制数据并静默提交打印任务：
+
+**POST** `http://127.0.0.1:8281/print/pdf?fileName=打印报表.pdf&landscape=false`
+
+- 请求头：`Content-Type: application/pdf`
+- 请求体：PDF 文件二进制，最大 50 MB
+- 响应：`{"success":true,"message":"PDF print job submitted",...}`
+
+XMReport 的 `report.js` 提供 `webReport.printLocal(options)` 调用此接口：
+
+```javascript
+webReport.printLocal({
+  templateId: "报表模板ID",
+  previewData: [{ name: "示例" }],
+  title: "销售报表",
+  landscape: false
+}).then(console.log).catch(console.error);
+```
+
+默认打印地址为 `http://127.0.0.1:8281/print/pdf`。更换本地打印方案时，可通过 `options.url` 传入其他地址。调用仍使用 `POST`、`Content-Type: application/pdf`，并在 URL 查询参数中附带 `fileName` 和 `landscape`。
+
+此方法不会打开浏览器预览页或打印对话框；PrintBridge 会将任务发送到系统默认打印机。
+
+#### 安全配置
+PrintBridge HTTP 服务仅绑定到本机 `127.0.0.1`，并验证浏览器 `Origin`。默认允许 `https://a.siksoft.com` 以及本地开发源。部署到其他网页来源时，在启动 PrintBridge 前设置 `PRINTBRIDGE_ALLOWED_ORIGINS`，值为逗号分隔的精确来源（包含 scheme 和端口，不含路径），例如：
+
+```powershell
+$env:PRINTBRIDGE_ALLOWED_ORIGINS = "https://reports.example.com"
+```
+
+不要使用 `*`；静默打印接口会直接调用本机默认打印机。
 
 ### 前端集成示例
 

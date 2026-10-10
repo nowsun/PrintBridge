@@ -1,5 +1,6 @@
 package com.magicyuan.print;
 
+import com.magicyuan.print.config.AppSettings;
 import com.magicyuan.print.service.JettyPrintService;
 import com.magicyuan.print.service.PrintService;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ public class SingleFileHTTPServer {
     private static final Object lock = new Object();
     private static JettyPrintService jettyPrintService;
     private static PrintService printService;
+    private static int currentPort = AppSettings.DEFAULT_PORT;
 
     /**
      * 设置打印服务实例
@@ -42,15 +44,18 @@ public class SingleFileHTTPServer {
                     return false;
                 }
 
+                AppSettings settings = AppSettings.load();
                 jettyPrintService = new JettyPrintService(printService);
-                boolean success = jettyPrintService.start(8281);
+                boolean success = jettyPrintService.start(settings.getPort());
 
                 if (success) {
+                    currentPort = settings.getPort();
                     logger.info("=== PrintBridge HTTP服务启动成功 ===");
-                    logger.info("监听端口: 8281");
+                    logger.info("监听地址: 127.0.0.1:" + settings.getPort());
                     logger.info("服务端点:");
-                    logger.info("  - POST http://localhost:8281/print  : 打印服务");
-                    logger.info("  - GET  http://localhost:8281/health : 健康检查");
+                    logger.info("  - POST http://localhost:" + settings.getPort() + "/print  : 打印服务");
+                    logger.info("  - POST http://127.0.0.1:" + settings.getPort() + "/print/pdf : 上传PDF并静默打印");
+                    logger.info("  - GET  http://localhost:" + settings.getPort() + "/health : 健康检查");
                     logger.info("=====================================");
                 } else {
                     logger.error("HTTP服务启动失败");
@@ -95,9 +100,20 @@ public class SingleFileHTTPServer {
     public static String getServerStatus() {
         synchronized (lock) {
             if (jettyPrintService != null && jettyPrintService.isRunning()) {
-                return "Jetty HTTP打印服务正在运行 - 端口: 8281";
+                return "Jetty HTTP打印服务正在运行 - 端口: " + currentPort;
             } else {
                 return "HTTP打印服务未运行";
+            }
+        }
+    }
+
+    /**
+     * 运行时应用配置(白名单热生效)。
+     */
+    public static void applySettings(AppSettings settings) {
+        synchronized (lock) {
+            if (jettyPrintService != null && jettyPrintService.isRunning()) {
+                jettyPrintService.setAllowedOrigins(settings.getAllowedOrigins());
             }
         }
     }

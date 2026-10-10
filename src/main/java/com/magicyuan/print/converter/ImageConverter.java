@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
  * 将图片格式(PNG/JPG/GIF/BMP)转换为PDF
  * 
  * @author Magic_yuan
- * @version 2.1.0
+ * @version 2.1.3
  */
 public class ImageConverter {
 
@@ -196,4 +196,3 @@ public class ImageConverter {
         }
     }
 }
-
