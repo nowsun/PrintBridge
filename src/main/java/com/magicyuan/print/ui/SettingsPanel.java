@@ -748,16 +748,28 @@ public class SettingsPanel extends JPanel {
             int h = getHeight();
             boolean on = isSelected();
 
-            Color track = on ? AppConfig.Colors.BUTTON_PRIMARY : trackOffColor();
+            Color track = on ? trackOnColor() : trackOffColor();
             g2.setColor(track);
             g2.fillRoundRect(0, 0, w - 1, h - 1, h, h);
 
             int d = h - 6;
             int ty = (h - d) / 2;
             int tx = on ? w - 4 - d : 3;
-            g2.setColor(Color.WHITE);
+            g2.setColor(trackKnobColor());
             g2.fillOval(tx, ty, d, d);
             g2.dispose();
+        }
+
+        /** 开启状态轨道色: 跟随主题的深/浅中性色(与主题、语言开关一致, 不用蓝色) */
+        private Color trackOnColor() {
+            Color c = UIManager.getColor("Label.foreground");
+            return c != null ? c : AppConfig.Colors.TEXT_PRIMARY;
+        }
+
+        /** 开关滑块色: 跟随主题背景色, 保证与轨道形成对比 */
+        private Color trackKnobColor() {
+            Color c = UIManager.getColor("Panel.background");
+            return c != null ? c : Color.WHITE;
         }
 
         private Color trackOffColor() {

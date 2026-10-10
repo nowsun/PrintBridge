@@ -73,11 +73,11 @@ public class PrintService {
         
         if (officeConverter.isAvailable()) {
             logger.info("✓ Office格式: Word, Excel, PowerPoint");
-            logger.info("  LibreOffice已检测到,多格式支持已启用");
+            logger.info("  已检测到Office/WPS/LibreOffice,多格式支持已启用");
         } else {
             logger.warn("⚠ Office格式: 不支持");
-            logger.warn("  未检测到LibreOffice,仅支持PDF和图片格式");
-            logger.warn("  安装LibreOffice以支持Word/Excel/PPT: https://www.libreoffice.org/");
+            logger.warn("  未检测到Microsoft Office、WPS或LibreOffice,仅支持PDF和图片格式");
+            logger.warn("  安装以上任一软件以支持Word/Excel/PPT: https://www.libreoffice.org/");
         }
         logger.info("=========================================");
     }
@@ -264,8 +264,8 @@ public class PrintService {
                 // Office格式,转换为PDF
                 if (!officeConverter.isAvailable()) {
                     throw new UnsupportedOperationException(
-                        "不支持Office格式: 未检测到LibreOffice。\n" +
-                        "请安装LibreOffice以支持Word/Excel/PPT格式: https://www.libreoffice.org/"
+                        "不支持Office格式: 未检测到Microsoft Office、WPS或LibreOffice。\n" +
+                        "请安装以上任一软件以支持Word/Excel/PPT格式: https://www.libreoffice.org/"
                     );
                 }
                 logger.info("检测到Office格式({}),转换为PDF后打印", fileExtension);
@@ -470,5 +470,47 @@ public class PrintService {
      */
     public boolean isOfficeConverterAvailable() {
         return officeConverter != null && officeConverter.isAvailable();
+    }
+
+    /**
+     * Word格式是否可打印
+     */
+    public boolean isWordAvailable() {
+        return officeConverter != null && officeConverter.isWordAvailable();
+    }
+
+    /**
+     * Excel格式是否可打印
+     */
+    public boolean isExcelAvailable() {
+        return officeConverter != null && officeConverter.isExcelAvailable();
+    }
+
+    /**
+     * PowerPoint格式是否可打印
+     */
+    public boolean isPptAvailable() {
+        return officeConverter != null && officeConverter.isPptAvailable();
+    }
+
+    /**
+     * 是否检测到Microsoft Office
+     */
+    public boolean isMsOfficeAvailable() {
+        return officeConverter != null && officeConverter.isMsOfficeAvailable();
+    }
+
+    /**
+     * 是否检测到WPS Office
+     */
+    public boolean isWpsAvailable() {
+        return officeConverter != null && officeConverter.isWpsAvailable();
+    }
+
+    /**
+     * 是否检测到LibreOffice
+     */
+    public boolean isLibreOfficeAvailable() {
+        return officeConverter != null && officeConverter.isLibreOfficeAvailable();
     }
 }

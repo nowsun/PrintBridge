@@ -43,6 +43,9 @@ public class AboutPanel extends JPanel {
     /** 格式条目前的勾选标记 */
     private static final String CHECK_MARK = "✅ ";
 
+    /** 格式条目前的不可用标记 */
+    private static final String CROSS_MARK = "❌ ";
+
     /** 节标题字体(加粗) */
     private static final Font SECTION_FONT = new Font(AppConfig.Fonts.FONT_FAMILY, Font.BOLD, 15);
 
@@ -129,7 +132,7 @@ public class AboutPanel extends JPanel {
         formatsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         content.add(formatsPanel);
 
-        // 安装多格式支持(仅未安装LibreOffice时显示)
+        // 安装多格式支持(仅未检测到Office/WPS/LibreOffice时显示)
         installBtn = UIComponentFactory.button(
             I18nManager.zhEn("安装多格式支持", "Install multi-format support"));
         installBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -171,7 +174,7 @@ public class AboutPanel extends JPanel {
         serviceLabel.setText(I18nManager.zhEn("服务地址", "Service URL")
             + ": http://127.0.0.1:" + settings.getPort());
 
-        // 安装按钮仅在未安装LibreOffice时显示
+        // 安装按钮仅在未检测到Office/WPS/LibreOffice时显示
         installBtn.setVisible(!printService.isOfficeConverterAvailable());
 
         formatsPanel.removeAll();
@@ -188,17 +191,26 @@ public class AboutPanel extends JPanel {
             I18nManager.zhEn("(自动转换为PDF):", "(auto-converted to PDF):"),
             new String[]{ "PNG, JPG, JPEG, GIF, BMP" });
 
-        // Office格式(橙色, 需要LibreOffice)
-        addFormatCard(AppConfig.Colors.STATUS_STARTING,
-            I18nManager.zhEn("Office格式", "Office formats"),
-            I18nManager.zhEn("(需要安装LibreOffice):", "(requires LibreOffice):"),
-            new String[]{ "Word (.docx, .doc)", "Excel (.xlsx, .xls)", "PowerPoint (.pptx, .ppt)" });
+        // Office格式: 逐个组件显示是否可打印
+        addOfficeStatusCard();
 
-        // 未安装LibreOffice时给出提示
-        if (!printService.isOfficeConverterAvailable()) {
+        // 检测状态提示
+        if (printService.isMsOfficeAvailable()) {
             addFormatNote(I18nManager.zhEn(
-                "如未安装LibreOffice,Office格式将无法打印。",
-                "If LibreOffice is not installed, Office formats cannot be printed."));
+                "✅ 支持打印 (已检测到 Microsoft Office)",
+                "✅ Printing supported (Microsoft Office detected)"));
+        } else if (printService.isWpsAvailable()) {
+            addFormatNote(I18nManager.zhEn(
+                "✅ 支持打印 (已检测到 WPS Office)",
+                "✅ Printing supported (WPS Office detected)"));
+        } else if (printService.isLibreOfficeAvailable()) {
+            addFormatNote(I18nManager.zhEn(
+                "✅ 支持打印 (已检测到 LibreOffice)",
+                "✅ Printing supported (LibreOffice detected)"));
+        } else {
+            addFormatNote(I18nManager.zhEn(
+                "❌ 未检测到 Microsoft Office、WPS 或 LibreOffice,Office 文档无法打印",
+                "❌ Microsoft Office, WPS or LibreOffice not detected; Office documents cannot be printed"));
         }
 
         // 固定格式区高度, 防止 BoxLayout 把多余空间分给格式区导致卡片拉伸
@@ -268,6 +280,58 @@ public class AboutPanel extends JPanel {
 
         formatsPanel.add(card);
         formatsPanel.add(Box.createVerticalStrut(8));
+    }
+
+    /** Office格式卡片: 按 Word/Excel/PPT 逐个显示是否可打印 */
+    private void addOfficeStatusCard() {
+        boolean wordOk = printService.isWordAvailable();
+        boolean excelOk = printService.isExcelAvailable();
+        boolean pptOk = printService.isPptAvailable();
+
+        Color accent;
+        if (wordOk && excelOk && pptOk) {
+            accent = AppConfig.Colors.STATUS_SUCCESS;
+        } else if (wordOk || excelOk || pptOk) {
+            accent = AppConfig.Colors.STATUS_STARTING;
+        } else {
+            accent = AppConfig.Colors.STATUS_ERROR;
+        }
+
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setOpaque(true);
+        card.setBackground(tinted(accent));
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 4, 0, 0, accent),
+            BorderFactory.createEmptyBorder(10, 14, 10, 14)));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // 标题
+        JLabel title = new JLabel(I18nManager.zhEn("Office格式", "Office formats"));
+        title.setFont(SECTION_FONT);
+        title.setForeground(UIComponentFactory.themeColor("Label.foreground", AppConfig.Colors.TEXT_PRIMARY));
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.add(title);
+        card.add(Box.createVerticalStrut(6));
+
+        // 每个格式的可用状态
+        card.add(formatStatusItem(I18nManager.zhEn("Word", "Word") + " (.docx, .doc)", wordOk));
+        card.add(Box.createVerticalStrut(3));
+        card.add(formatStatusItem(I18nManager.zhEn("Excel", "Excel") + " (.xlsx, .xls)", excelOk));
+        card.add(Box.createVerticalStrut(3));
+        card.add(formatStatusItem(I18nManager.zhEn("PowerPoint", "PowerPoint") + " (.pptx, .ppt)", pptOk));
+
+        formatsPanel.add(card);
+        formatsPanel.add(Box.createVerticalStrut(8));
+    }
+
+    /** 单个格式的 ✅/❌ 状态条目 */
+    private JLabel formatStatusItem(String label, boolean available) {
+        JLabel item = new JLabel((available ? CHECK_MARK : CROSS_MARK) + label);
+        item.setFont(CHECK_FONT);
+        item.setForeground(UIComponentFactory.themeColor("Label.disabledForeground", AppConfig.Colors.TEXT_SECONDARY));
+        item.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return item;
     }
 
     /** 底部说明文字 */

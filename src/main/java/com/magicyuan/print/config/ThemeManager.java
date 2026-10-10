@@ -2,6 +2,7 @@ package com.magicyuan.print.config;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -122,28 +123,77 @@ public class ThemeManager {
     }
 
     /**
-     * 检测 Windows 系统是否使用深色主题。
+     * 检测系统是否使用深色主题(Windows / macOS / Linux)。
      */
     private static boolean isSystemDark() {
-        if (!System.getProperty("os.name", "").toLowerCase().contains("win")) {
-            return false;
-        }
+        String os = System.getProperty("os.name", "").toLowerCase();
         try {
-            Process process = new ProcessBuilder("reg", "query",
-                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                "/v", "AppsUseLightTheme").redirectErrorStream(true).start();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            if (os.contains("win")) {
+                return isWindowsDark();
+            } else if (os.contains("mac")) {
+                return isMacDark();
+            } else {
+                return isLinuxDark();
+            }
+        } catch (Exception e) {
+            logger.debug("检测系统主题失败, 默认浅色: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    /** Windows: 注册表 AppsUseLightTheme */
+    private static boolean isWindowsDark() throws Exception {
+        Process process = new ProcessBuilder("reg", "query",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            "/v", "AppsUseLightTheme").redirectErrorStream(true).start();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.contains("AppsUseLightTheme")) {
+                    return line.trim().endsWith("0x0");
+                }
+            }
+        }
+        process.waitFor();
+        return false;
+    }
+
+    /** macOS: defaults read -g AppleInterfaceStyle 返回 "Dark" 表示深色 */
+    private static boolean isMacDark() {
+        String out = runAndCapture("defaults", "read", "-g", "AppleInterfaceStyle");
+        return out != null && out.trim().equalsIgnoreCase("Dark");
+    }
+
+    /** Linux(GNOME): gsettings color-scheme 含 dark; 兼容旧版 gtk-application-prefer-dark-theme */
+    private static boolean isLinuxDark() {
+        String scheme = runAndCapture("gsettings", "get", "org.gnome.desktop.interface", "color-scheme");
+        if (scheme != null && scheme.toLowerCase().contains("dark")) {
+            return true;
+        }
+        String legacy = runAndCapture("gsettings", "get", "org.gnome.desktop.interface", "gtk-application-prefer-dark-theme");
+        return legacy != null && legacy.trim().equalsIgnoreCase("true");
+    }
+
+    /** 执行命令并捕获合并后的输出; 失败返回 null */
+    private static String runAndCapture(String... cmd) {
+        try {
+            Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    if (line.contains("AppsUseLightTheme")) {
-                        return line.trim().endsWith("0x0");
+                    if (sb.length() > 0) {
+                        sb.append('\n');
                     }
+                    sb.append(line);
                 }
             }
             process.waitFor();
+            return sb.toString();
         } catch (Exception e) {
-            logger.debug("检测系统主题失败, 默认浅色");
+            logger.debug("命令执行失败 {}: {}", cmd[0], e.getMessage());
+            return null;
         }
-        return false;
     }
 }
