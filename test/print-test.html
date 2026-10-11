@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrintBridge 打印服务测试页</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --line: #e3e5e8;
+    --text: #2b2f36;
+    --muted: #6b7280;
+    --accent: #3f434a;
+    --ok: #1f9d55;
+    --bad: #c0392b;
+    --warn: #b7791f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    display: grid; grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 18px; align-items: start;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 18px;
+  }
+  .left .card:last-child { margin-bottom: 0; }
+  .card h2 { font-size: 16px; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+  label { font-size: 13px; color: var(--muted); min-width: 88px; }
+  input[type=text] {
+    flex: 1; min-width: 220px; padding: 8px 10px; font-size: 14px;
+    border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--text);
+  }
+  input[type=file] { font-size: 13px; }
+  button {
+    padding: 9px 16px; font-size: 14px; border: 1px solid var(--accent);
+    background: var(--accent); color: #fff; border-radius: 6px; cursor: pointer;
+  }
+  button.secondary { background: #fff; color: var(--text); border-color: var(--line); }
+  button:hover { opacity: .9; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+  .badge.ok { background: #e6f6ec; color: var(--ok); }
+  .badge.bad { background: #fdecea; color: var(--bad); }
+  .badge.warn { background: #fdf3e3; color: var(--warn); }
+  code, pre {
+    font-family: Consolas, "Courier New", monospace;
+    background: #f1f2f4; border-radius: 4px;
+  }
+  code { padding: 1px 5px; font-size: 12px; }
+  pre {
+    padding: 12px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+    margin: 8px 0; border: 1px solid var(--line);
+  }
+  .hint { font-size: 13px; color: var(--muted); margin: 4px 0; }
+  .hint b { color: var(--text); }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .check input { transform: scale(1.1); }
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
+
+  /* 右侧日志：固定高度、吸顶，随左侧滚动时保持可见 */
+  .log-card {
+    position: sticky; top: 24px;
+    display: flex; flex-direction: column;
+    height: calc(100vh - 48px);
+  }
+  .log-card .log-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .log-card .log-head h2 { margin: 0; padding: 0; border: none; }
+  .log {
+    flex: 1; background: #1e2126; color: #d7dce3; border-radius: 8px; padding: 12px;
+    font-family: Consolas, "Courier New", monospace; font-size: 12px;
+    overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .log .ok { color: #5fd08a; }
+  .log .bad { color: #ff7b72; }
+  .log .warn { color: #e3b341; }
+  .log .muted { color: #8b949e; }
+
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; }
+    .log-card { position: static; height: 420px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ 左侧：配置与测试操作 ============ -->
+  <div class="left">
+
+    <h1>PrintBridge 打印服务测试页</h1>
+    <div class="sub">用于在虚拟机中测试 <b>① 网站白名单</b> 与 <b>② Office 文件打印</b>。所有请求都发往本机运行的 PrintBridge。</div>
+
+    <!-- 重要提示 -->
+    <div class="card">
+      <h2>⚠️ 使用前必读：白名单怎么起作用的</h2>
+      <p class="hint">
+        PrintBridge 会校验每个打印请求的 <code>Origin</code> 请求头，只有命中「白名单」才受理，否则返回
+        <code>403 Origin not allowed</code>。<b>浏览器会自动带上本页面的 Origin，无法手动伪造</b>，所以：
+      </p>
+      <ul class="hint" style="margin:6px 0 0 18px; padding:0;">
+        <li><b>本页必须从一个「白名单内的源」打开</b>才会被放行；直接双击以 <code>file://</code> 打开，Origin 是 <code>null</code>，会被拒绝。</li>
+        <li>默认白名单：<code>https://siksoft.com</code>（含子域名 <code>https://*.siksoft.com</code>）、<code>http://localhost:8080</code>、<code>http://127.0.0.1:8080</code>。</li>
+        <li>推荐在 <b>8080 端口</b>起一个静态服务器，把本目录（含测试用 Office 文件）作为根目录：</li>
+      </ul>
+      <pre># 在本目录(test/)下，任选其一：
+python -m http.server 8080
+npx http-server . -p 8080
+# 然后浏览器打开： http://localhost:8080/print-test.html</pre>
+      <p class="hint">这样页面 Origin 是 <code>http://localhost:8080</code>（命中白名单），同时 Office 测试文件也能以 <code>http://localhost:8080/xxx.docx</code> 形式被 PrintBridge 下载。</p>
+    </div>
+
+    <!-- 服务器配置 -->
+    <div class="card">
+      <h2>服务器连接</h2>
+      <div class="row">
+        <label>服务地址</label>
+        <input type="text" id="baseUrl" value="http://127.0.0.1:8281">
+        <button class="secondary" onclick="testHealth()">健康检查</button>
+      </div>
+      <div class="row" style="margin-bottom:0;">
+        <label>当前页面 Origin</label>
+        <input type="text" id="pageOrigin" value="" readonly style="color:var(--muted);">
+        <span id="originBadge"></span>
+      </div>
+      <p class="hint" style="margin-top:8px;">「白名单状态」由页面<b>向服务器发真实请求</b>判定（不依赖页面内置列表，与 app 里 <code>printbridge.ini</code> 的实际配置一致）。健康检查(<code>GET /health</code>)不做 Origin 校验，可用来确认连通性。</p>
+    </div>
+
+    <!-- 一、白名单测试 -->
+    <div class="card">
+      <h2>一、网站白名单测试</h2>
+      <p class="hint">
+        点击「测试白名单」会向 <code>POST /print</code> 发一个<b>空请求体</b>（不会真正打印）。
+        结果含义：<span class="badge ok">400</span> = Origin 在白名单、请求已受理（空体所以报 400，属预期）；
+        <span class="badge bad">403</span> 或「浏览器 CORS 拦截」 = Origin 不在白名单、被拒绝。
+      </p>
+      <div class="row">
+        <button onclick="testWhitelist()">测试白名单</button>
+        <button class="secondary" onclick="testWhitelistBlocked()">模拟非白名单源(见说明)</button>
+      </div>
+      <p class="hint" style="margin-top:8px;">
+        「模拟非白名单源」使用 <code>mode:'no-cors'</code> 走一条不携带 CORS 凭据的通道，配合控制台(F12)可观察服务器返回 <code>403</code>。
+        更可靠的对照方法是<b>换一个端口</b>（如 <code>3000</code>）起服务器再打开本页，即可看到真实被拒效果。
+      </p>
+      <p class="hint"><b>命令行对照测试</b>（在 PowerShell 里，可精确指定任意 Origin）：</p>
+      <pre id="curlAllowed"># 白名单内 —— 预期 HTTP 200（请求体为空会返回 400，但说明 Origin 已放行）
+curl.exe -X POST http://127.0.0.1:8281/print -H "Origin: https://siksoft.com" -H "Content-Type: application/json" -d "[]"
+
+# 白名单外 —— 预期 HTTP 403 Origin not allowed
+curl.exe -X POST http://127.0.0.1:8281/print -H "Origin: https://evil.com" -H "Content-Type: application/json" -d "[]"</pre>
+      <button class="secondary" onclick="copyCurl()">复制命令行</button>
+    </div>
+
+    <!-- 二、Office 文件打印 -->
+    <div class="card">
+      <h2>二、Office 文件打印</h2>
+      <p class="hint">
+        方式 A：<b>按 URL 打印</b>。PrintBridge 服务端会下载 <code>fileUrl</code> 指向的 Office 文件
+        （doc/docx/rtf/txt、xls/xlsx/csv、ppt/pptx），用本机 Office/WPS/LibreOffice 转成 PDF 后打印。
+      </p>
+      <div class="row">
+        <label>文件 URL</label>
+        <input type="text" id="fileUrl" placeholder="http://localhost:8080/sample.docx">
+      </div>
+      <div class="row">
+        <label>文件名</label>
+        <input type="text" id="fileName" placeholder="sample.docx" style="max-width:280px;">
+        <span class="check"><input type="checkbox" id="landscape">横向打印</span>
+      </div>
+      <div class="row">
+        <button onclick="printByUrl()">打印 Office 文件(URL)</button>
+        <button class="secondary" onclick="fillSample('docx')">示例 Word</button>
+        <button class="secondary" onclick="fillSample('xlsx')">示例 Excel</button>
+        <button class="secondary" onclick="fillSample('pptx')">示例 PPT</button>
+      </div>
+
+      <hr class="sep">
+
+      <p class="hint">方式 B：<b>直接上传 PDF</b>（<code>POST /print/pdf</code>，静默打印）。</p>
+      <div class="row">
+        <label>PDF 文件</label>
+        <input type="file" id="pdfFile" accept="application/pdf">
+        <span class="check"><input type="checkbox" id="pdfLandscape">横向打印</span>
+      </div>
+      <div class="row">
+        <label>文件名</label>
+        <input type="text" id="pdfFileName" placeholder="留空则用原文件名" style="max-width:280px;">
+      </div>
+      <div class="row">
+        <button onclick="printPdf()">上传并打印 PDF</button>
+      </div>
+      <p class="sub" style="margin:12px 0 0;">
+        提示：测试 Office 打印时，请先在「关于」页确认本机已检测到 Office/WPS/LibreOffice，且 Word/Excel/PPT 对应的格式为 ✅。
+      </p>
+    </div>
+
+  </div>
+
+  <!-- ============ 右侧：请求结果日志（固定高度，无需上下滚动） ============ -->
+  <div class="card log-card">
+    <div class="log-head">
+      <h2>请求结果</h2>
+      <button class="secondary" onclick="clearLog()">清空</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+</div>
+
+<script>
+  var baseUrlInput = document.getElementById('baseUrl');
+  var pageOriginInput = document.getElementById('pageOrigin');
+  var originBadge = document.getElementById('originBadge');
+  var logEl = document.getElementById('log');
+
+  // 显示当前页面 Origin，并通过真实请求判断是否在白名单（不依赖硬编码列表）
+  (function init() {
+    var o = location.origin; // file:// 下为 "null"
+    pageOriginInput.value = o;
+    if (o === 'null' || o === 'file://') {
+      originBadge.innerHTML = '<span class="badge bad">未通过（file:// 或 null）</span>';
+      log('warn', '当前以 file:// 打开，Origin 为 null，打印请求会被白名单拒绝。请用静态服务器打开本页。');
+    } else {
+      originBadge.innerHTML = '<span class="badge warn">校验中…</span>';
+      runWhitelistCheck();
+    }
+  })();
+
+  function base() { return baseUrlInput.value.replace(/\/+$/,''); }
+
+  function ts() {
+    var d = new Date();
+    function p(n){ return (n<10?'0':'')+n; }
+    return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  }
+
+  function log(type, text) {
+    var line = document.createElement('div');
+    line.className = type;
+    line.textContent = '[' + ts() + '] ' + text;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function clearLog() { logEl.innerHTML = ''; }
+
+  async function request(url, options) {
+    try {
+      var resp = await fetch(url, options);
+      var text = '';
+      try { text = await resp.text(); } catch (e) {}
+      return { corsError:false, status: resp.status, statusText: resp.statusText, body: text };
+    } catch (err) {
+      return { corsError:true, status:0, statusText:'CORS/网络错误', body: String(err) };
+    }
+  }
+
+  // no-cors 探针：服务器在线时返回 true（不抛错），离线/端口不对时返回 false
+  async function probeServer() {
+    try {
+      await fetch(base() + '/health', { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function logResult(tag, r) {
+    if (r.corsError) {
+      log('bad', tag + ' ❌ 浏览器拦截（CORS/网络错误）。Origin 很可能不在白名单：' + r.body);
+      return;
+    }
+    var cls = (r.status >= 200 && r.status < 300) ? 'ok' : (r.status === 403 ? 'bad' : 'warn');
+    log(cls, tag + ' HTTP ' + r.status + ' ' + r.statusText + ' → ' + r.body);
+  }
+
+  async function testHealth() {
+    log('muted', 'GET ' + base() + '/health');
+    var r = await request(base() + '/health');
+    logResult('健康检查', r);
+    if (r.corsError) {
+      var online = await probeServer();
+      if (!online) {
+        log('bad', '连不上服务：PrintBridge 可能未运行，或端口不对（默认 8281）。');
+      } else {
+        log('bad', '服务在线，但当前 Origin 不在白名单，浏览器无法读取响应。');
+      }
+    } else {
+      log('muted', '说明：/health 仅做存活检查、不校验白名单；白名单结果请看顶部徽标或日志里的「白名单校验」行。');
+    }
+  }
+
+  async function runWhitelistCheck() {
+    var r = await request(base() + '/print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: ''
+    });
+    var myOrigin = pageOriginInput.value;
+    if (r.corsError) {
+      var online = await probeServer();
+      if (!online) {
+        originBadge.innerHTML = '<span class="badge bad">连不上服务</span>';
+        log('bad', '连不上 ' + base() + ' —— 请确认 PrintBridge 正在运行、端口正确（默认 8281）。');
+      } else {
+        originBadge.innerHTML = '<span class="badge bad">不在白名单（CORS 拦截）</span>';
+        log('bad', '服务在线，但拒绝了 Origin「' + myOrigin + '」。请把该 Origin 原样添加到 app 的「设置 → 网站白名单」后重试。');
+      }
+    } else if (r.status === 403) {
+      originBadge.innerHTML = '<span class="badge bad">不在白名单（403）</span>';
+      log('bad', '白名单校验 ❌ 服务器返回 403，Origin「' + myOrigin + '」不在白名单。请把该 Origin 原样添加到 app 的「设置 → 网站白名单」后重试。');
+    } else if (r.status === 400) {
+      originBadge.innerHTML = '<span class="badge ok">在白名单</span>';
+      log('ok', '白名单校验 ✅ Origin 已被服务器放行（空请求体故返回 400，属预期）');
+    } else {
+      originBadge.innerHTML = '<span class="badge warn">HTTP ' + r.status + '</span>';
+      log('warn', '白名单校验 HTTP ' + r.status + ' → ' + r.body);
+    }
+  }
+
+  async function testWhitelist() {
+    log('muted', '手动触发白名单校验 → POST ' + base() + '/print');
+    await runWhitelistCheck();
+  }
+
+  async function testWhitelistBlocked() {
+    log('muted', 'POST ' + base() + '/print  (mode:no-cors，对照观察)');
+    // no-cors 下拿不到状态码，仅用于在控制台观察服务器是否返回 403。
+    try {
+      await fetch(base() + '/print', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: ''
+      });
+      log('warn', 'no-cors 请求已发出（浏览器隐藏了响应）。请打开 F12 → Network 查看实际 HTTP 状态：403 = 被白名单拒绝。');
+    } catch (err) {
+      log('bad', 'no-cors 请求失败：' + err);
+    }
+  }
+
+  async function printByUrl() {
+    var fileUrl = document.getElementById('fileUrl').value.trim();
+    var fileName = document.getElementById('fileName').value.trim();
+    var landscape = document.getElementById('landscape').checked;
+    if (!fileUrl) { log('warn', '请先填写文件 URL'); return; }
+    if (!fileName) { fileName = fileUrl.split('/').pop().split('?')[0]; }
+
+    var payload = [{ fileUrl: fileUrl, fileName: fileName, landscape: landscape }];
+    log('muted', 'POST ' + base() + '/print   body=' + JSON.stringify(payload));
+    var r = await request(base() + '/print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    logResult('Office 打印(URL)', r);
+  }
+
+  async function printPdf() {
+    var file = document.getElementById('pdfFile').files[0];
+    if (!file) { log('warn', '请先选择 PDF 文件'); return; }
+    var fileName = document.getElementById('pdfFileName').value.trim() || file.name;
+    var landscape = document.getElementById('pdfLandscape').checked;
+    var url = base() + '/print/pdf?fileName=' + encodeURIComponent(fileName) + '&landscape=' + landscape;
+    log('muted', 'POST ' + url + '  (' + file.name + ', ' + file.size + ' 字节)');
+    var r = await request(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/pdf' },
+      body: file
+    });
+    logResult('PDF 打印', r);
+  }
+
+  function fillSample(ext) {
+    var map = { docx: 'samples.docx', xlsx: 'samples.xlsx', pptx: 'samples.pptx' };
+    var name = map[ext];
+    document.getElementById('fileUrl').value = 'http://localhost:8080/' + name;
+    document.getElementById('fileName').value = name;
+    if (ext === 'pptx') {
+      log('warn', '已填入示例 PPT 地址：http://localhost:8080/' + name + '。注意：当前 test 目录没有 PPT 文件，请先放入一个 samples.pptx（或把 URL 改成你自己的 PPT 文件地址）。');
+    } else {
+      log('muted', '已填入示例：http://localhost:8080/' + name);
+    }
+  }
+
+  function copyCurl() {
+    var text = document.getElementById('curlAllowed').innerText;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){ log('ok','已复制命令行到剪贴板'); }, function(){ log('warn','复制失败，请手动复制'); });
+    } else {
+      log('warn','当前环境不支持剪贴板，请手动复制');
+    }
+  }
+</script>
+</body>
+</html>

@@ -48,6 +48,11 @@ public class AppSettings {
     private String language = "zh-CN";
 
     /**
+     * Office转换引擎: auto(默认,优先LibreOffice,回退原生) / native(仅Office/WPS) / libreoffice(仅LibreOffice)
+     */
+    private String convertEngine = "auto";
+
+    /**
      * 从配置文件加载设置,文件不存在或读取失败时返回默认配置。
      */
     public static AppSettings load() {
@@ -106,6 +111,9 @@ public class AppSettings {
         }
         if (language == null || !("zh-CN".equals(language) || "en".equals(language))) {
             language = "zh-CN";
+        }
+        if (convertEngine == null || !("auto".equals(convertEngine) || "native".equals(convertEngine) || "libreoffice".equals(convertEngine))) {
+            convertEngine = "auto";
         }
     }
 
@@ -171,5 +179,13 @@ public class AppSettings {
 
     public void setLanguage(String language) {
         this.language = language;
+    }
+
+    public String getConvertEngine() {
+        return convertEngine;
+    }
+
+    public void setConvertEngine(String convertEngine) {
+        this.convertEngine = convertEngine;
     }
 }

@@ -89,6 +89,7 @@ public class PrintService {
         this.defaultPrinterName = settings.getPrinterName() == null ? "" : settings.getPrinterName();
         this.paperWidthMm = settings.getPaperWidthMm() > 0 ? settings.getPaperWidthMm() : AppSettings.DEFAULT_PAPER_WIDTH_MM;
         this.paperHeightMm = settings.getPaperHeightMm() > 0 ? settings.getPaperHeightMm() : AppSettings.DEFAULT_PAPER_HEIGHT_MM;
+        this.officeConverter.setConvertEngine(settings.getConvertEngine());
         logger.info("打印设置已应用: 打印机={}, 纸张={}x{}mm",
             defaultPrinterName.isEmpty() ? "系统默认" : defaultPrinterName, paperWidthMm, paperHeightMm);
     }
@@ -313,7 +314,10 @@ public class PrintService {
      * 打印本地PDF文件
      */
     private boolean printPdfFile(File pdfFile, PrintDTO printDTO, boolean showDialog) throws Exception {
-        PDDocument document = PDDocument.load(pdfFile);
+        // 先整体读入内存再打印:虚拟打印机(如 Microsoft Print to PDF)会弹"另存为"并阻塞,
+        // 若以 File 方式加载,PDFBox 会一直占用该文件句柄,导致转换产物"被占用、打不开"。
+        byte[] pdfBytes = Files.readAllBytes(pdfFile.toPath());
+        PDDocument document = PDDocument.load(pdfBytes);
 
         try {
             return executePrint(document, printDTO, showDialog);

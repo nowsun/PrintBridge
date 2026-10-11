@@ -48,12 +48,29 @@ public class OfficeConverter {
     private Path nativeScript;
 
     /**
+     * 转换引擎偏好: auto(默认,优先LibreOffice,回退原生) / native(仅Office/WPS) / libreoffice(仅LibreOffice)
+     */
+    private String convertEngine = "auto";
+
+    /**
      * 构造函数,自动检测原生Office/WPS与LibreOffice
      */
     public OfficeConverter() {
         detectNativeOffice();
         detectLibreOffice();
         extractNativeScript();
+    }
+
+    /**
+     * 设置转换引擎偏好(auto/native/libreoffice)
+     */
+    public void setConvertEngine(String convertEngine) {
+        if (convertEngine == null || !("auto".equals(convertEngine) || "native".equals(convertEngine) || "libreoffice".equals(convertEngine))) {
+            this.convertEngine = "auto";
+        } else {
+            this.convertEngine = convertEngine;
+        }
+        logger.info("Office转换引擎偏好: {}", this.convertEngine);
     }
 
     /**
@@ -272,21 +289,40 @@ public class OfficeConverter {
     }
 
     /**
-     * 根据文件扩展名选择原生Office/WPS或LibreOffice进行转换
+     * 根据文件扩展名与convertEngine配置选择原生Office/WPS或LibreOffice进行转换
      */
     private void convertToPdf(File input, File output) throws Exception {
         String ext = extensionOf(input.getName());
+        String kind = kindOf(ext);
+        boolean nativeCapable = shouldUseNative(ext);
 
-        if (shouldUseNative(ext)) {
-            // 原生转换: 先删除空的输出文件,由Office/WPS自己创建
-            Files.deleteIfExists(output.toPath());
-            convertNative(input, output, kindOf(ext));
-        } else {
+        if (preferLibreOffice()) {
             if (!libreOfficeAvailable) {
-                throw new IllegalStateException("没有可用的Office转换引擎");
+                throw new IllegalStateException("没有可用的LibreOffice转换引擎");
             }
             libreOfficeConverter.convert(input).to(output).execute();
+        } else {
+            if (!nativeCapable) {
+                throw new IllegalStateException("没有可用的原生Office/WPS转换引擎(或该格式不受原生引擎支持)");
+            }
+            // 原生转换: 先删除空的输出文件,由Office/WPS自己创建
+            Files.deleteIfExists(output.toPath());
+            convertNative(input, output, kind);
         }
+    }
+
+    /**
+     * 是否优先使用LibreOffice(依据convertEngine配置与可用性)
+     */
+    private boolean preferLibreOffice() {
+        if ("native".equalsIgnoreCase(convertEngine)) {
+            return false;
+        }
+        if ("libreoffice".equalsIgnoreCase(convertEngine)) {
+            return true;
+        }
+        // auto(默认): 有LibreOffice优先用(快),否则回退原生
+        return libreOfficeAvailable;
     }
 
     /**

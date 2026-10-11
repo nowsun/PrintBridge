@@ -92,12 +92,14 @@ public class JettyPrintService {
             // 创建上下文处理器集合
             ContextHandlerCollection contexts = new ContextHandlerCollection();
 
-            // 打印服务上下文
+            // 打印服务上下文（禁止补斜杠的 302 重定向，否则会破坏 CORS 预检）
             ContextHandler printContext = new ContextHandler("/print");
+            printContext.setAllowNullPathInfo(true);
             printContext.setHandler(new PrintHandler());
 
             // 健康检查上下文
             ContextHandler healthContext = new ContextHandler("/health");
+            healthContext.setAllowNullPathInfo(true);
             healthContext.setHandler(new HealthHandler());
 
             // 根路径处理（OPTIONS预检请求）

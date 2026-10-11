@@ -528,6 +528,8 @@ public class PrintMainFrame extends JFrame implements ServerStatusService.Status
         if (!systemTrayManager.showTrayIcon()) {
             setVisible(true);
         }
+        // 启动时立即启动HTTP服务：托盘运行同样要对外提供打印服务，不能等窗口打开
+        serverStatusService.startServerAsync();
     }
 
     /**
