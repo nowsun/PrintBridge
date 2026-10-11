@@ -494,11 +494,6 @@ public class PrintMainFrame extends JFrame implements ServerStatusService.Status
     private void setupEventListeners() {
         addWindowListener(new WindowAdapter() {
             @Override
-            public void windowOpened(WindowEvent e) {
-                serverStatusService.startServerAsync();
-            }
-
-            @Override
             public void windowClosing(WindowEvent e) {
                 handleWindowClosing();
             }
@@ -522,14 +517,25 @@ public class PrintMainFrame extends JFrame implements ServerStatusService.Status
     }
 
     /**
-     * 启动时隐藏主窗体并显示到系统托盘(托盘不可用时回退为正常显示窗口)
+     * 启动时根据服务启动结果决定是否显示主窗体:
+     * 启动成功 -> 隐藏到系统托盘(托盘不可用时回退为显示窗口);
+     * 启动失败 -> 显示主窗体,便于查看状态与修改配置。
      */
     public void startInSystemTray() {
-        if (!systemTrayManager.showTrayIcon()) {
-            setVisible(true);
-        }
-        // 启动时立即启动HTTP服务：托盘运行同样要对外提供打印服务，不能等窗口打开
-        serverStatusService.startServerAsync();
+        // 启动时立即启动HTTP服务: 托盘运行同样要对外提供打印服务,不能等窗口打开
+        serverStatusService.startServerAsync().thenAccept(success -> {
+            SwingUtilities.invokeLater(() -> {
+                if (success) {
+                    // 服务启动成功, 隐藏到系统托盘; 托盘不可用时回退为显示窗口
+                    if (!systemTrayManager.showTrayIcon()) {
+                        setVisible(true);
+                    }
+                } else {
+                    // 服务启动失败, 显示主窗体以便查看/修改配置
+                    setVisible(true);
+                }
+            });
+        });
     }
 
     /**
