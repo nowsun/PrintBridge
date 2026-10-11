@@ -241,7 +241,6 @@ public class JettyPrintService {
     public void setAllowedOrigins(Collection<String> origins) {
         Set<String> set = new HashSet<String>(origins);
         this.allowedOrigins = Collections.unmodifiableSet(set);
-        logger.info("已更新允许的网页来源: {}", allowedOrigins);
     }
 
     /**
