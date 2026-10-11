@@ -1,6 +1,7 @@
 package com.magicyuan.print.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.text.SimpleDateFormat;
@@ -10,6 +11,7 @@ import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -18,6 +20,7 @@ import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 
 import com.magicyuan.print.config.AppConfig;
@@ -62,7 +65,7 @@ public class TasksPanel extends JPanel {
             I18nManager.zhEn("文件名", "File"),
             I18nManager.zhEn("状态", "Status"),
             I18nManager.zhEn("时间", "Time"),
-            I18nManager.zhEn("来源", "Source"),
+            I18nManager.zhEn("来源网址", "Source URL"),
             I18nManager.zhEn("打印机", "Printer")
         }, 0) {
             @Override
@@ -70,7 +73,17 @@ public class TasksPanel extends JPanel {
                 return false;
             }
         };
-        table = new JTable(tableModel);
+        table = new JTable(tableModel) {
+            @Override
+            public Component prepareRenderer(TableCellRenderer renderer, int row, int column) {
+                Component component = super.prepareRenderer(renderer, row, column);
+                if (component instanceof JComponent) {
+                    Object value = getValueAt(row, column);
+                    ((JComponent) component).setToolTipText(value == null ? null : value.toString());
+                }
+                return component;
+            }
+        };
         table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         table.setFont(UIComponentFactory.FIELD_FONT);
         table.getTableHeader().setFont(UIComponentFactory.FIELD_FONT);
@@ -98,8 +111,8 @@ public class TasksPanel extends JPanel {
 
     /** 按列属性设置合理列宽(文件名/来源较宽, 状态较窄) */
     private void configureColumns() {
-        int[] widths = {200, 80, 150, 220, 160};
-        int[] minWidths = {120, 60, 100, 120, 100};
+        int[] widths = {200, 80, 175, 180, 160};
+        int[] minWidths = {120, 60, 170, 100, 100};
         for (int i = 0; i < widths.length; i++) {
             TableColumn column = table.getColumnModel().getColumn(i);
             column.setPreferredWidth(widths[i]);
@@ -156,16 +169,17 @@ public class TasksPanel extends JPanel {
 
     /** 任务来源标签(参考 TS 版: 网页/测试) */
     private String sourceLabel(PrintDTO dto) {
+        // 优先显示具体来源网址: URL打印显示文件地址, 上传打印显示来源页面Origin
+        if (dto.getFileUrl() != null && !dto.getFileUrl().isEmpty()) {
+            return dto.getFileUrl();
+        }
+        if (dto.getSourceUrl() != null && !dto.getSourceUrl().isEmpty()) {
+            return dto.getSourceUrl();
+        }
         if ("test".equals(dto.getSource())) {
             return I18nManager.zhEn("测试", "Test");
         }
-        if ("web".equals(dto.getSource())) {
-            return I18nManager.zhEn("网页", "Web");
-        }
-        if (dto.getFileUrl() != null && !dto.getFileUrl().isEmpty()) {
-            return I18nManager.zhEn("网页", "Web");
-        }
-        return I18nManager.zhEn("本地", "Local");
+        return I18nManager.zhEn("网页", "Web");
     }
 
     private String formatTime(long createTime) {

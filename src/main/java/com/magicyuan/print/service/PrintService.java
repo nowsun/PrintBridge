@@ -129,12 +129,13 @@ public class PrintService {
      * Asynchronously print a PDF uploaded by a local browser client without a dialog.
      */
     public CompletableFuture<Void> printPdfBytesWithoutDialogAsync(
-            byte[] pdfBytes, String fileName, boolean landscape) {
+            byte[] pdfBytes, String fileName, boolean landscape, String sourceUrl) {
         final byte[] documentBytes = pdfBytes;
         final PrintDTO printDTO = new PrintDTO();
         printDTO.setFileName(fileName);
         printDTO.setLandscape(landscape);
         printDTO.setSource("web");
+        printDTO.setSourceUrl(sourceUrl);
 
         return CompletableFuture.runAsync(() -> {
             logger.info("收到PDF上传,直接打印: {} ({} 字节)", fileName, documentBytes.length);

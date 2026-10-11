@@ -363,7 +363,8 @@ public class JettyPrintService {
                 return;
             }
 
-            printService.printPdfBytesWithoutDialogAsync(pdfBytes, fileName, landscape);
+            printService.printPdfBytesWithoutDialogAsync(pdfBytes, fileName, landscape,
+                    request.getHeader("Origin"));
             sendSuccessResponse(response, "PDF print job submitted");
         }
 

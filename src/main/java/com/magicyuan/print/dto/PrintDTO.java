@@ -17,6 +17,9 @@ public class PrintDTO {
     /** 任务来源: web(网页) / test(测试) */
     private String source;
 
+    /** 来源网址(网页URL或上传来源页面Origin), 用于任务列表展示 */
+    private String sourceUrl;
+
     public String getFileUrl() {
         return fileUrl;
     }
@@ -63,6 +66,14 @@ public class PrintDTO {
 
     public void setSource(String source) {
         this.source = source;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
     }
 
     @Override
