@@ -216,5 +216,6 @@ public class AppSettings {
         context.getLogger("com.magicyuan.print.service.PrintService").setLevel(level);
         context.getLogger("com.magicyuan.print.converter.OfficeConverter").setLevel(level);
         context.getLogger("com.magicyuan.print.converter.ImageConverter").setLevel(level);
+        context.getLogger("com.magicyuan.print.service.PrintJob").setLevel(level);
     }
 }

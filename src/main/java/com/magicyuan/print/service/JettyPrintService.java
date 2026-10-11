@@ -39,6 +39,9 @@ public class JettyPrintService {
 
     private static final Logger logger = LoggerFactory.getLogger(JettyPrintService.class);
 
+    /** 每单打印请求的日志(独立 logger,按 logEnabled 配置开关) */
+    private static final Logger jobLogger = LoggerFactory.getLogger("com.magicyuan.print.service.PrintJob");
+
     private static final int DEFAULT_PORT = 8281;
 
     private static final int MIN_THREADS = 10;
@@ -403,16 +406,16 @@ public class JettyPrintService {
                     dto.setSource("web");
                 }
 
-                logger.info("收到打印请求，文件数量: {}", printList.size());
+                jobLogger.info("收到打印请求，文件数量: {}", printList.size());
                 for (PrintDTO dto : printList) {
-                    logger.info("  - 文件: {}, URL: {}", dto.getFileName(), dto.getFileUrl());
+                    jobLogger.info("  - 文件: {}, URL: {}", dto.getFileName(), dto.getFileUrl());
                 }
 
                 // 异步执行打印任务
                 CompletableFuture.runAsync(() -> {
                     try {
                         printService.printWithoutDialog(printList);
-                        logger.info("打印任务执行完成");
+                        jobLogger.info("打印任务执行完成");
                     } catch (Exception e) {
                         logger.error("执行打印任务时发生错误: {}", e.getMessage(), e);
                     }
