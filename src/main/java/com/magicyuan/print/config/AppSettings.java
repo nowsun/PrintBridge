@@ -60,6 +60,11 @@ public class AppSettings {
     private boolean logEnabled = false;
 
     /**
+     * 打印任务历史上限: 列表记录数超过该值(默认100)时清空整个列表,避免无限增长。
+     */
+    private int maxTaskHistory = 100;
+
+    /**
      * 从配置文件加载设置,文件不存在或读取失败时返回默认配置。
      */
     public static AppSettings load() {
@@ -121,6 +126,9 @@ public class AppSettings {
         }
         if (convertEngine == null || !("auto".equals(convertEngine) || "native".equals(convertEngine) || "libreoffice".equals(convertEngine))) {
             convertEngine = "auto";
+        }
+        if (maxTaskHistory <= 0) {
+            maxTaskHistory = 100;
         }
     }
 
@@ -202,6 +210,14 @@ public class AppSettings {
 
     public void setLogEnabled(boolean logEnabled) {
         this.logEnabled = logEnabled;
+    }
+
+    public int getMaxTaskHistory() {
+        return maxTaskHistory;
+    }
+
+    public void setMaxTaskHistory(int maxTaskHistory) {
+        this.maxTaskHistory = maxTaskHistory;
     }
 
     /**

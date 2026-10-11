@@ -16,6 +16,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 
@@ -90,6 +91,9 @@ public class TasksPanel extends JPanel {
         add(card, BorderLayout.CENTER);
 
         reload();
+
+        // 监听队列变化,任务新增/失败/清空时自动刷新列表(无需手动点"刷新")
+        queueModel.addChangeListener(() -> SwingUtilities.invokeLater(this::reload));
     }
 
     /** 按列属性设置合理列宽(文件名/来源较宽, 状态较窄) */

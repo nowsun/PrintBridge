@@ -11,7 +11,7 @@ import com.magicyuan.print.dto.PrintDTO;
 /**
  * 打印队列数据模型
  * 管理打印任务的数据状态
- * 
+ *
  * @author Magic_yuan
  * @version 2.0.0
  */
@@ -20,6 +20,11 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
     private final List<PrintDTO> printQueue;
 
     private final List<PrintDTO> errorQueue;
+
+    private final List<Runnable> changeListeners = new CopyOnWriteArrayList<>();
+
+    /** 任务列表记录上限(超过即清空整个列表,默认100) */
+    private int maxTaskCount = 100;
 
     public PrintQueueModel() {
         this.printQueue = new CopyOnWriteArrayList<>();
@@ -46,6 +51,8 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
         printQueue.add(printDTO);
         int index = printQueue.size() - 1;
         fireIntervalAdded(this, index, index);
+        enforceLimit();
+        fireChanged();
     }
 
     /**
@@ -60,6 +67,7 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
         printQueue.addAll(printDTOs);
         int endIndex = printQueue.size() - 1;
         fireIntervalAdded(this, startIndex, endIndex);
+        fireChanged();
     }
 
     /**
@@ -69,6 +77,7 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
         if (index >= 0 && index < printQueue.size()) {
             printQueue.remove(index);
             fireIntervalRemoved(this, index, index);
+            fireChanged();
         }
     }
 
@@ -80,6 +89,7 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
         if (size > 0) {
             printQueue.clear();
             fireIntervalRemoved(this, 0, size - 1);
+            fireChanged();
         }
     }
 
@@ -111,6 +121,8 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
             printDTO.setCreateTime(System.currentTimeMillis());
         }
         errorQueue.add(printDTO);
+        enforceLimit();
+        fireChanged();
     }
 
     /**
@@ -125,6 +137,40 @@ public class PrintQueueModel extends AbstractListModel<PrintDTO> {
      */
     public void clearErrorQueue() {
         errorQueue.clear();
+        fireChanged();
+    }
+
+    /**
+     * 注册队列变更监听器(任务新增/移除/清空时触发,用于界面自动刷新)。
+     */
+    public void addChangeListener(Runnable listener) {
+        changeListeners.add(listener);
+    }
+
+    /**
+     * 设置任务列表记录上限(<=0 时回退为默认100)。
+     */
+    public void setMaxTaskCount(int maxTaskCount) {
+        this.maxTaskCount = maxTaskCount > 0 ? maxTaskCount : 100;
+    }
+
+    /**
+     * 列表记录数超过上限时清空整个列表(避免无限增长)。
+     */
+    private void enforceLimit() {
+        if (printQueue.size() + errorQueue.size() > maxTaskCount) {
+            printQueue.clear();
+            errorQueue.clear();
+        }
+    }
+
+    /**
+     * 通知所有变更监听器(打印队列或错误队列发生变化)。
+     */
+    private void fireChanged() {
+        for (Runnable listener : changeListeners) {
+            listener.run();
+        }
     }
 
     /**

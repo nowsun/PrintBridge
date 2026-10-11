@@ -74,6 +74,7 @@ public class PrintMainFrame extends JFrame implements ServerStatusService.Status
 
         // 初始化配置与打印服务
         this.settings = AppSettings.load();
+        this.printQueueModel.setMaxTaskCount(settings.getMaxTaskHistory());
         this.printService = new PrintService(printQueueModel);
         this.printService.applySettings(settings);
 
