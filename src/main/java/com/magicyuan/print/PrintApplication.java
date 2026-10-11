@@ -31,6 +31,7 @@ public class PrintApplication {
 
         // 加载设置并应用语言与主题
         AppSettings settings = AppSettings.load();
+        settings.applyLoggingLevel();
         applyLanguage(settings.getLanguage());
         setupLookAndFeel(settings.getTheme());
 

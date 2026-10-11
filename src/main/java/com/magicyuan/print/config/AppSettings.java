@@ -10,6 +10,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.alibaba.fastjson.JSON;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +53,11 @@ public class AppSettings {
      * Office转换引擎: auto(默认,优先LibreOffice,回退原生) / native(仅Office/WPS) / libreoffice(仅LibreOffice)
      */
     private String convertEngine = "auto";
+
+    /**
+     * 打印日志开关: false=隐藏每单打印/转换过程日志(默认,启动/运行/错误日志保留) / true=显示全部
+     */
+    private boolean logEnabled = false;
 
     /**
      * 从配置文件加载设置,文件不存在或读取失败时返回默认配置。
@@ -187,5 +194,27 @@ public class AppSettings {
 
     public void setConvertEngine(String convertEngine) {
         this.convertEngine = convertEngine;
+    }
+
+    public boolean isLogEnabled() {
+        return logEnabled;
+    }
+
+    public void setLogEnabled(boolean logEnabled) {
+        this.logEnabled = logEnabled;
+    }
+
+    /**
+     * 应用日志开关。
+     * logEnabled=false 时,仅把打印/转换相关 logger(PrintService/OfficeConverter/ImageConverter)
+     * 降到 ERROR,隐藏每单打印的 info 日志;启动、运行、错误日志保持 logback.xml 默认(INFO)。
+     * logEnabled=true 时不做改动,全部按 INFO 输出。
+     */
+    public void applyLoggingLevel() {
+        LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+        Level level = logEnabled ? Level.INFO : Level.ERROR;
+        context.getLogger("com.magicyuan.print.service.PrintService").setLevel(level);
+        context.getLogger("com.magicyuan.print.converter.OfficeConverter").setLevel(level);
+        context.getLogger("com.magicyuan.print.converter.ImageConverter").setLevel(level);
     }
 }

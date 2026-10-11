@@ -137,6 +137,7 @@ public class PrintService {
         printDTO.setSource("web");
 
         return CompletableFuture.runAsync(() -> {
+            logger.info("收到PDF上传,直接打印: {} ({} 字节)", fileName, documentBytes.length);
             try (PDDocument document = PDDocument.load(documentBytes)) {
                 executePrint(document, printDTO, false);
                 printQueueModel.addPrintTask(printDTO);

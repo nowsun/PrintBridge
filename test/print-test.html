@@ -100,7 +100,7 @@
   <div class="left">
 
     <h1>PrintBridge 打印服务测试页</h1>
-    <div class="sub">用于在虚拟机中测试 <b>① 网站白名单</b> 与 <b>② Office 文件打印</b>。所有请求都发往本机运行的 PrintBridge。</div>
+    <div class="sub">用于测试 <b>① 网站白名单</b> 与 <b>② Office 文件打印</b>。所有请求都发往本机运行的 PrintBridge。</div>
 
     <!-- 重要提示 -->
     <div class="card">
@@ -387,11 +387,7 @@ curl.exe -X POST http://127.0.0.1:8281/print -H "Origin: https://evil.com" -H "C
     var name = map[ext];
     document.getElementById('fileUrl').value = 'http://localhost:8080/' + name;
     document.getElementById('fileName').value = name;
-    if (ext === 'pptx') {
-      log('warn', '已填入示例 PPT 地址：http://localhost:8080/' + name + '。注意：当前 test 目录没有 PPT 文件，请先放入一个 samples.pptx（或把 URL 改成你自己的 PPT 文件地址）。');
-    } else {
-      log('muted', '已填入示例：http://localhost:8080/' + name);
-    }
+    log('muted', '已填入示例：http://localhost:8080/' + name);
   }
 
   function copyCurl() {
